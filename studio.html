@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Studio AI - AI Music Platform</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        "brand": "#E85002",
+        "brand-hover": "#F16001",
+        "bg": "#000000",
+        "panel": "#111111",
+        "surface": "#1A1A1A",
+        "border": "#333333",
+        "border-light": "#444444",
+        "txt": "#F9F9F9",
+        "txt-muted": "#A7A7A7",
+        "txt-dim": "#646464",
+        "dk-gray": "#333333",
+      },
+      fontFamily: {
+        "display": ["Space Grotesk", "sans-serif"]
+      },
+    },
+  },
+}
+</script>
+<style>
+body { font-family: 'Space Grotesk', sans-serif; background: #000; color: #F9F9F9; }
+.waveform-bar {
+  width: 3px; border-radius: 2px; margin: 0 1px;
+  background-color: #E85002;
+}
+.waveform-bar.muted { background-color: #333; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #444; }
+.glass-effect { backdrop-filter: blur(16px); background-color: rgba(0, 0, 0, 0.88); }
+.page { display: none; }
+.page.active { display: flex; }
+.fill-1 { font-variation-settings: 'FILL' 1; }
+.nav-link { transition: all 0.15s; }
+.nav-link:hover { background: #1A1A1A; }
+.nav-link.active { background: rgba(232, 80, 2, 0.1); color: #E85002; }
+.dropdown { display: none; position: absolute; top: 100%; right: 0; z-index: 50; min-width: 160px; }
+.dropdown.open { display: block; }
+.toast {
+  position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%);
+  background: linear-gradient(135deg, #E85002, #F16001); color: #F9F9F9;
+  padding: 10px 24px; border-radius: 12px;
+  font-size: 14px; font-weight: 600; z-index: 100; opacity: 0;
+  transition: opacity 0.3s; pointer-events: none;
+}
+.toast.show { opacity: 1; }
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+  z-index: 60; align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.genre-chip.selected { background: rgba(232, 80, 2, 0.15); border-color: #E85002; color: #E85002; }
+input[type="range"] {
+  -webkit-appearance: none; appearance: none; height: 4px;
+  background: #333; border-radius: 4px; outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 12px; height: 12px;
+  background: #F9F9F9; border-radius: 50%; cursor: pointer;
+}
+.progress-track { cursor: pointer; }
+.progress-track:hover .progress-handle { opacity: 1; }
+.progress-handle {
+  position: absolute; right: -6px; top: 50%; transform: translateY(-50%);
+  width: 12px; height: 12px; background: #F9F9F9; border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.5); opacity: 0; transition: opacity 0.15s;
+}
+.filter-btn.active { background: rgba(232, 80, 2, 0.12); color: #E85002; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.animate-fadeIn { animation: fadeIn 0.25s ease-out; }
+.badge-public { background: rgba(232, 80, 2, 0.12); color: #E85002; }
+.badge-private { background: rgba(249, 249, 249, 0.06); color: #A7A7A7; border: 1px solid rgba(249, 249, 249, 0.08); }
+.brand-gradient { background: linear-gradient(135deg, #000000, #C10801, #F16001, #D9C3AB); }
+</style>
+</head>
+<body class="antialiased">
+<div class="flex h-screen overflow-hidden">
+
+<!-- ==================== SIDEBAR ==================== -->
+<aside class="w-64 flex-shrink-0 border-r border-border flex flex-col bg-panel z-10">
+  <div class="p-6 flex items-center cursor-pointer" onclick="navigateTo('home')">
+    <img src="logo.png" alt="FIIRE" class="h-16 w-auto" />
+  </div>
+  <nav class="flex-1 px-4 py-2 flex flex-col gap-1">
+    <a class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer" data-page="home" onclick="navigateTo('home')">
+      <span class="material-symbols-outlined">home</span>
+      <span class="text-sm font-medium">Home</span>
+    </a>
+    <a class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer" data-page="library" onclick="navigateTo('library')">
+      <span class="material-symbols-outlined">library_music</span>
+      <span class="text-sm font-medium">My Library</span>
+    </a>
+    <a class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer" data-page="create" onclick="navigateTo('create')">
+      <span class="material-symbols-outlined">add_circle</span>
+      <span class="text-sm font-medium">Create</span>
+    </a>
+    <a class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg text-txt-muted cursor-pointer" onclick="showToast('Trending page coming soon')">
+      <span class="material-symbols-outlined">trending_up</span>
+      <span class="text-sm font-medium">Trending</span>
+    </a>
+    <div class="mt-6 mb-3">
+      <p class="px-3 text-[10px] uppercase tracking-widest text-txt-dim font-bold">Playlists</p>
+    </div>
+    <a class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg text-txt-muted cursor-pointer" onclick="showToast('Favorites coming soon')">
+      <span class="material-symbols-outlined">favorite</span>
+      <span class="text-sm font-medium">Favorites</span>
+    </a>
+    <a class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg text-txt-muted cursor-pointer" onclick="showToast('Playlist created!')">
+      <span class="material-symbols-outlined">add_box</span>
+      <span class="text-sm font-medium">Create Playlist</span>
+    </a>
+    <a class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg text-txt-muted cursor-pointer" onclick="showToast('Opening Neon Vibes 2024')">
+      <span class="text-sm font-medium truncate">Neon Vibes 2024</span>
+    </a>
+  </nav>
+  <div class="p-4 border-t border-border">
+    <button onclick="navigateTo('create')" class="w-full flex items-center justify-center gap-2 py-3 bg-brand hover:bg-brand-hover text-txt rounded-xl font-bold text-sm shadow-lg shadow-brand/20 transition-all">
+      <span class="material-symbols-outlined text-[18px]">add</span>
+      New Project
+    </button>
+  </div>
+</aside>
+
+<!-- ==================== MAIN CONTENT ==================== -->
+<div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+<!-- ========== PAGE: HOME ========== -->
+<div id="page-home" class="page flex-col flex-1 overflow-hidden">
+  <header class="sticky top-0 z-30 flex items-center justify-between px-8 py-4 glass-effect border-b border-border">
+    <div class="flex items-center flex-1 max-w-xl">
+      <div class="relative w-full">
+        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-txt-muted">search</span>
+        <input id="home-search" class="w-full bg-surface border border-border rounded-xl pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-brand/50 focus:border-brand text-txt placeholder-txt-dim" placeholder="Search tracks, genres, or artists..." type="text" oninput="filterHomeContent()"/>
+      </div>
+    </div>
+    <div class="flex items-center gap-4">
+      <button class="p-2 rounded-lg bg-surface border border-border text-txt hover:bg-dk-gray relative transition-colors" onclick="showToast('No new notifications')">
+        <span class="material-symbols-outlined">notifications</span>
+      </button>
+      <button class="p-2 rounded-lg bg-surface border border-border text-txt hover:bg-dk-gray transition-colors" onclick="showToast('Settings coming soon')">
+        <span class="material-symbols-outlined">settings</span>
+      </button>
+      <div class="w-10 h-10 rounded-full bg-brand flex items-center justify-center text-sm font-bold text-txt cursor-pointer" onclick="showToast('Profile settings')">U</div>
+    </div>
+  </header>
+  <main class="flex-1 overflow-y-auto pb-28">
+    <div class="px-8 py-6 space-y-8">
+      <!-- Quick Create -->
+      <section class="bg-panel rounded-2xl p-6 border border-border">
+        <div class="flex gap-4">
+          <div class="w-12 h-12 rounded-full bg-brand/15 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-brand font-bold">bolt</span>
+          </div>
+          <div class="flex-1 flex flex-col gap-4">
+            <div class="space-y-1">
+              <h2 class="text-lg font-bold">What's the vibe?</h2>
+              <p class="text-sm text-txt-muted">AI will generate a unique track based on your description.</p>
+            </div>
+            <div class="relative">
+              <textarea id="home-prompt" class="w-full bg-bg border border-border rounded-xl p-4 text-sm focus:ring-2 focus:ring-brand focus:border-brand text-txt resize-none placeholder-txt-dim" placeholder="A high-energy synthwave track with heavy bass and 80s arcade sound effects..." rows="2"></textarea>
+              <div class="absolute bottom-3 right-3 flex items-center gap-2">
+                <button class="p-1.5 rounded-lg text-txt-dim hover:text-brand transition-colors" onclick="showToast('Voice input coming soon')">
+                  <span class="material-symbols-outlined text-[20px]">mic</span>
+                </button>
+                <button class="p-1.5 rounded-lg text-txt-dim hover:text-brand transition-colors" onclick="navigateTo('create')">
+                  <span class="material-symbols-outlined text-[20px]">tune</span>
+                </button>
+                <button class="bg-brand hover:bg-brand-hover text-txt px-5 py-2 rounded-lg text-sm font-bold transition-all ml-2" onclick="quickGenerate()">
+                  Generate
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Genre Chips -->
+      <div id="home-genres" class="flex gap-2 overflow-x-auto pb-2">
+        <button class="genre-chip selected px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap border border-transparent transition-all" onclick="toggleGenreChip(this)" data-genre="all">All Moods</button>
+        <button class="genre-chip px-4 py-1.5 bg-surface rounded-full text-sm font-medium whitespace-nowrap border border-border hover:border-brand transition-all text-txt" onclick="toggleGenreChip(this)" data-genre="synthwave">Synthwave</button>
+        <button class="genre-chip px-4 py-1.5 bg-surface rounded-full text-sm font-medium whitespace-nowrap border border-border hover:border-brand transition-all text-txt" onclick="toggleGenreChip(this)" data-genre="lo-fi">Lo-fi</button>
+        <button class="genre-chip px-4 py-1.5 bg-surface rounded-full text-sm font-medium whitespace-nowrap border border-border hover:border-brand transition-all text-txt" onclick="toggleGenreChip(this)" data-genre="cinematic">Cinematic</button>
+        <button class="genre-chip px-4 py-1.5 bg-surface rounded-full text-sm font-medium whitespace-nowrap border border-border hover:border-brand transition-all text-txt" onclick="toggleGenreChip(this)" data-genre="techno">Techno</button>
+        <button class="genre-chip px-4 py-1.5 bg-surface rounded-full text-sm font-medium whitespace-nowrap border border-border hover:border-brand transition-all text-txt" onclick="toggleGenreChip(this)" data-genre="cyberpunk">Cyberpunk</button>
+        <button class="genre-chip px-4 py-1.5 bg-surface rounded-full text-sm font-medium whitespace-nowrap border border-border hover:border-brand transition-all text-txt" onclick="toggleGenreChip(this)" data-genre="acoustic">Acoustic</button>
+      </div>
+
+      <!-- Trending Now -->
+      <section id="trending-section">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-2xl font-bold tracking-tight">Trending Now</h3>
+          <a class="text-sm font-medium text-brand hover:underline cursor-pointer" onclick="showToast('View all trending')">View All</a>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div class="group bg-panel p-4 rounded-2xl border border-border hover:border-border-light hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer" data-genres="synthwave" onclick="playTrack('Midnight Drift', 'EchoPulse AI', 'from-[#C10801] via-[#F16001] to-[#D9C3AB]', 202)">
+            <div class="relative aspect-square rounded-xl overflow-hidden mb-4 bg-surface">
+              <div class="w-full h-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500"></div>
+              <button class="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div class="w-14 h-14 bg-brand text-txt rounded-full flex items-center justify-center shadow-lg">
+                  <span class="material-symbols-outlined text-[32px] fill-1">play_arrow</span>
+                </div>
+              </button>
+            </div>
+            <h4 class="font-bold text-base truncate">Midnight Drift</h4>
+            <p class="text-xs text-txt-muted mb-3">by EchoPulse AI</p>
+            <div class="flex flex-wrap gap-1">
+              <span class="px-2 py-0.5 bg-surface border border-border text-[10px] rounded-md text-txt-muted">Synthwave</span>
+              <span class="px-2 py-0.5 bg-surface border border-border text-[10px] rounded-md text-txt-muted">80s</span>
+            </div>
+          </div>
+          <div class="group bg-panel p-4 rounded-2xl border border-border hover:border-border-light hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer" data-genres="ambient" onclick="playTrack('Ethereal Forest', 'LunaGen', 'from-cyan-400 to-blue-600', 234)">
+            <div class="relative aspect-square rounded-xl overflow-hidden mb-4 bg-surface">
+              <div class="w-full h-full bg-gradient-to-bl from-cyan-400 to-blue-600"></div>
+              <button class="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div class="w-14 h-14 bg-brand text-txt rounded-full flex items-center justify-center shadow-lg">
+                  <span class="material-symbols-outlined text-[32px] fill-1">play_arrow</span>
+                </div>
+              </button>
+            </div>
+            <h4 class="font-bold text-base truncate">Ethereal Forest</h4>
+            <p class="text-xs text-txt-muted mb-3">by LunaGen</p>
+            <div class="flex flex-wrap gap-1">
+              <span class="px-2 py-0.5 bg-surface border border-border text-[10px] rounded-md text-txt-muted">Ambient</span>
+              <span class="px-2 py-0.5 bg-surface border border-border text-[10px] rounded-md text-txt-muted">Chill</span>
+            </div>
+          </div>
+          <div class="group bg-panel p-4 rounded-2xl border border-border hover:border-border-light hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer" data-genres="cinematic" onclick="playTrack('Desert Storm', 'Catalyst', 'from-yellow-400 via-orange-500 to-red-500', 195)">
+            <div class="relative aspect-square rounded-xl overflow-hidden mb-4 bg-surface">
+              <div class="w-full h-full bg-gradient-to-tr from-yellow-400 via-orange-500 to-red-500"></div>
+              <button class="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div class="w-14 h-14 bg-brand text-txt rounded-full flex items-center justify-center shadow-lg">
+                  <span class="material-symbols-outlined text-[32px] fill-1">play_arrow</span>
+                </div>
+              </button>
+            </div>
+            <h4 class="font-bold text-base truncate">Desert Storm</h4>
+            <p class="text-xs text-txt-muted mb-3">by Catalyst</p>
+            <div class="flex flex-wrap gap-1">
+              <span class="px-2 py-0.5 bg-surface border border-border text-[10px] rounded-md text-txt-muted">Industrial</span>
+              <span class="px-2 py-0.5 bg-surface border border-border text-[10px] rounded-md text-txt-muted">Dark</span>
+            </div>
+          </div>
+          <div class="group bg-panel p-4 rounded-2xl border border-border hover:border-border-light hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer" data-genres="lo-fi acoustic" onclick="playTrack('Morning Dew', 'SereneAI', 'from-emerald-400 to-cyan-400', 178)">
+            <div class="relative aspect-square rounded-xl overflow-hidden mb-4 bg-surface">
+              <div class="w-full h-full bg-gradient-to-r from-emerald-400 to-cyan-400"></div>
+              <button class="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div class="w-14 h-14 bg-brand text-txt rounded-full flex items-center justify-center shadow-lg">
+                  <span class="material-symbols-outlined text-[32px] fill-1">play_arrow</span>
+                </div>
+              </button>
+            </div>
+            <h4 class="font-bold text-base truncate">Morning Dew</h4>
+            <p class="text-xs text-txt-muted mb-3">by SereneAI</p>
+            <div class="flex flex-wrap gap-1">
+              <span class="px-2 py-0.5 bg-surface border border-border text-[10px] rounded-md text-txt-muted">Lo-fi</span>
+              <span class="px-2 py-0.5 bg-surface border border-border text-[10px] rounded-md text-txt-muted">Jazz</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- New Drops -->
+      <section id="drops-section">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-2xl font-bold tracking-tight">New Drops</h3>
+          <a class="text-sm font-medium text-brand hover:underline cursor-pointer">See Newest</a>
+        </div>
+        <div class="space-y-2">
+          <div class="group flex items-center gap-4 p-3 rounded-xl hover:bg-panel border border-transparent hover:border-border transition-all cursor-pointer" onclick="playTrack('Cybernetic Pulse', 'User_9921', 'from-purple-800 to-indigo-900', 222)">
+            <div class="w-12 h-12 rounded-lg overflow-hidden bg-surface">
+              <div class="w-full h-full bg-gradient-to-br from-purple-800 to-indigo-900"></div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <h5 class="font-bold text-sm truncate">Cybernetic Pulse</h5>
+              <p class="text-[10px] text-txt-muted">User_9921</p>
+            </div>
+            <span class="text-xs text-txt-dim hidden md:block">2 mins ago</span>
+            <span class="text-xs text-txt-dim font-mono">3:42</span>
+            <button class="text-txt-muted hover:text-brand" onclick="event.stopPropagation(); toggleFavorite(this)">
+              <span class="material-symbols-outlined text-[20px]">favorite</span>
+            </button>
+            <button class="text-txt-muted hover:text-brand" onclick="event.stopPropagation(); showToast('More options')">
+              <span class="material-symbols-outlined text-[20px]">more_horiz</span>
+            </button>
+          </div>
+          <div class="group flex items-center gap-4 p-3 rounded-xl hover:bg-panel border border-transparent hover:border-border transition-all cursor-pointer" onclick="playTrack('Neon Tears', 'SynthQueen', 'from-pink-500 to-rose-400', 178)">
+            <div class="w-12 h-12 rounded-lg overflow-hidden bg-surface">
+              <div class="w-full h-full bg-gradient-to-tr from-pink-500 to-rose-400"></div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <h5 class="font-bold text-sm truncate">Neon Tears</h5>
+              <p class="text-[10px] text-txt-muted">SynthQueen</p>
+            </div>
+            <span class="text-xs text-txt-dim hidden md:block">5 mins ago</span>
+            <span class="text-xs text-txt-dim font-mono">2:58</span>
+            <button class="text-txt-muted hover:text-brand" onclick="event.stopPropagation(); toggleFavorite(this)">
+              <span class="material-symbols-outlined text-[20px]">favorite</span>
+            </button>
+            <button class="text-txt-muted hover:text-brand" onclick="event.stopPropagation(); showToast('More options')">
+              <span class="material-symbols-outlined text-[20px]">more_horiz</span>
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- ========== PAGE: LIBRARY ========== -->
+<div id="page-library" class="page flex-col flex-1 overflow-hidden">
+  <header class="flex flex-wrap items-center justify-between gap-4 p-8">
+    <div class="flex flex-col gap-1">
+      <h2 class="text-4xl font-black tracking-tight">My Creations</h2>
+      <p class="text-txt-muted">Manage and organize your AI-generated tracks.</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <button class="flex items-center gap-2 bg-surface text-txt px-4 py-2 rounded-lg text-sm font-bold border border-border hover:bg-dk-gray transition-colors" onclick="showToast('Import feature coming soon')">
+        <span class="material-symbols-outlined text-[20px]">cloud_upload</span>
+        Import
+      </button>
+      <button class="flex items-center gap-2 bg-brand hover:bg-brand-hover text-txt px-4 py-2 rounded-lg text-sm font-bold shadow-lg shadow-brand/20 transition-all" onclick="navigateTo('create')">
+        <span class="material-symbols-outlined text-[20px]">magic_button</span>
+        Generate New Track
+      </button>
+    </div>
+  </header>
+  <div class="px-8 mb-4 space-y-4">
+    <div class="flex flex-col md:flex-row gap-4 items-center">
+      <div class="flex-1 w-full">
+        <label class="relative block">
+          <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-txt-muted">
+            <span class="material-symbols-outlined">search</span>
+          </span>
+          <input id="library-search" class="w-full bg-surface border border-border rounded-lg py-3 pl-12 pr-4 text-sm focus:ring-2 focus:ring-brand focus:border-brand placeholder:text-txt-dim text-txt" placeholder="Search your library..." type="text" oninput="filterLibrary()"/>
+        </label>
+      </div>
+      <div class="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+        <button class="filter-btn active flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap" onclick="setLibraryFilter('all', this)">All Tracks</button>
+        <button class="filter-btn flex items-center gap-2 bg-surface border border-border px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-txt" onclick="setLibraryFilter('public', this)">Public</button>
+        <button class="filter-btn flex items-center gap-2 bg-surface border border-border px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-txt" onclick="setLibraryFilter('private', this)">Private</button>
+        <button class="filter-btn flex items-center gap-2 bg-surface border border-border px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap relative text-txt" onclick="toggleSortDropdown(this)">
+          Recent <span class="material-symbols-outlined text-sm">expand_more</span>
+          <div class="dropdown bg-panel border border-border rounded-lg mt-1 py-1 shadow-xl">
+            <div class="px-4 py-2 hover:bg-surface text-sm cursor-pointer" onclick="event.stopPropagation(); setSortOrder('recent')">Recent</div>
+            <div class="px-4 py-2 hover:bg-surface text-sm cursor-pointer" onclick="event.stopPropagation(); setSortOrder('oldest')">Oldest</div>
+            <div class="px-4 py-2 hover:bg-surface text-sm cursor-pointer" onclick="event.stopPropagation(); setSortOrder('name')">Name A-Z</div>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="flex-1 overflow-auto px-8 pb-32">
+    <div class="bg-panel rounded-xl border border-border overflow-hidden">
+      <table class="w-full text-left border-collapse">
+        <thead>
+          <tr class="bg-surface">
+            <th class="px-6 py-4 text-sm font-semibold">Song Title</th>
+            <th class="px-6 py-4 text-sm font-semibold">Date Created</th>
+            <th class="px-6 py-4 text-sm font-semibold">Genre</th>
+            <th class="px-6 py-4 text-sm font-semibold text-center">Status</th>
+            <th class="px-6 py-4 text-sm font-semibold text-txt-muted text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="library-tbody" class="divide-y divide-border"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ========== PAGE: CREATE ========== -->
+<div id="page-create" class="page flex-1 overflow-hidden">
+  <aside class="w-[420px] bg-panel border-r border-border flex flex-col h-full overflow-y-auto">
+    <div class="p-6 space-y-8">
+      <div>
+        <h2 class="text-xl font-bold mb-4">Create New Track</h2>
+        <div class="flex h-11 items-center justify-center rounded-xl bg-bg p-1 border border-border mb-6">
+          <label class="flex cursor-pointer h-full grow items-center justify-center rounded-lg px-2 has-[:checked]:bg-surface has-[:checked]:text-txt text-txt-dim text-sm font-medium transition-all">
+            <span>Simple Mode</span>
+            <input checked name="create-mode" type="radio" value="simple" class="hidden"/>
+          </label>
+          <label class="flex cursor-pointer h-full grow items-center justify-center rounded-lg px-2 has-[:checked]:bg-surface has-[:checked]:text-txt text-txt-dim text-sm font-medium transition-all">
+            <span>Custom Mode</span>
+            <input name="create-mode" type="radio" value="custom" class="hidden"/>
+          </label>
+        </div>
+        <div class="space-y-6">
+          <div class="flex flex-col gap-2">
+            <label class="text-sm font-semibold text-txt-muted uppercase tracking-wider">Song Description</label>
+            <div class="relative">
+              <textarea id="create-prompt" class="w-full h-32 rounded-xl bg-bg border border-border focus:border-brand focus:ring-1 focus:ring-brand p-4 text-txt placeholder:text-txt-dim resize-none font-display text-sm leading-relaxed" placeholder="Describe the style, mood, and instruments (e.g., 'A lo-fi hip hop track with a melancholic piano melody and rainy atmosphere')..."></textarea>
+              <div class="absolute bottom-3 right-3 flex gap-2">
+                <button class="text-txt-dim hover:text-txt transition-colors" onclick="showToast('Voice input coming soon')"><span class="material-symbols-outlined text-lg">mic</span></button>
+                <button class="text-txt-dim hover:text-txt transition-colors" onclick="showToast('File upload coming soon')"><span class="material-symbols-outlined text-lg">upload_file</span></button>
+              </div>
+            </div>
+          </div>
+          <div class="flex flex-col gap-3">
+            <label class="text-sm font-semibold text-txt-muted uppercase tracking-wider">Style of Music</label>
+            <div id="create-genres" class="flex flex-wrap gap-2">
+              <span class="genre-chip selected px-3 py-1.5 rounded-lg border border-brand bg-brand/15 text-brand text-xs font-bold cursor-pointer transition-all" onclick="toggleCreateGenre(this)" data-genre="lo-fi">Lo-fi</span>
+              <span class="genre-chip px-3 py-1.5 rounded-lg bg-bg border border-border text-txt-muted text-xs font-medium hover:border-txt-dim cursor-pointer transition-colors" onclick="toggleCreateGenre(this)" data-genre="jazz">Jazz</span>
+              <span class="genre-chip px-3 py-1.5 rounded-lg bg-bg border border-border text-txt-muted text-xs font-medium hover:border-txt-dim cursor-pointer transition-colors" onclick="toggleCreateGenre(this)" data-genre="synthwave">Synthwave</span>
+              <span class="genre-chip px-3 py-1.5 rounded-lg bg-bg border border-border text-txt-muted text-xs font-medium hover:border-txt-dim cursor-pointer transition-colors" onclick="toggleCreateGenre(this)" data-genre="cinematic">Cinematic</span>
+              <span class="genre-chip px-3 py-1.5 rounded-lg bg-bg border border-border text-txt-muted text-xs font-medium hover:border-txt-dim cursor-pointer transition-colors" onclick="toggleCreateGenre(this)" data-genre="classical">Classical</span>
+              <button class="px-3 py-1.5 rounded-lg bg-bg border border-border text-brand text-xs font-bold flex items-center gap-1" onclick="showToast('Custom genre added!')">
+                <span class="material-symbols-outlined text-xs">add</span> Add Custom
+              </button>
+            </div>
+          </div>
+          <div class="flex flex-col gap-2">
+            <label class="text-sm font-semibold text-txt-muted uppercase tracking-wider">Model Version</label>
+            <select class="w-full rounded-xl bg-bg border border-border focus:border-brand focus:ring-1 focus:ring-brand p-3 text-txt text-sm appearance-none">
+              <option>Sonic v3.5 (Pro) - Highest Quality</option>
+              <option>Sonic v3.0 - Fast Generation</option>
+              <option>Sonic v2.0 - Legacy</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mt-auto p-6 bg-panel/80 backdrop-blur-md border-t border-border">
+      <button class="w-full bg-brand hover:bg-brand-hover text-txt font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-[0_0_24px_rgba(232,80,2,0.25)] group" onclick="generateTrack()">
+        <span class="material-symbols-outlined group-hover:rotate-12 transition-transform">bolt</span>
+        Generate 2 Tracks (10 Credits)
+      </button>
+      <p class="text-center text-xs text-txt-dim mt-3">Estimated generation time: 20-30 seconds</p>
+    </div>
+  </aside>
+  <main class="flex-1 bg-bg overflow-y-auto pb-28">
+    <div class="max-w-4xl mx-auto p-8">
+      <div class="flex items-center justify-between mb-8">
+        <h3 class="text-xl font-bold">Recent Generations</h3>
+        <div class="flex gap-2">
+          <button class="p-2 text-txt-muted hover:text-txt transition-colors"><span class="material-symbols-outlined">filter_list</span></button>
+          <button class="p-2 text-txt-muted hover:text-txt transition-colors"><span class="material-symbols-outlined">grid_view</span></button>
+        </div>
+      </div>
+      <div id="generations-list" class="space-y-4">
+        <div class="bg-panel border border-brand/30 rounded-2xl p-5 flex items-center gap-6 shadow-xl shadow-brand/5 cursor-pointer" onclick="playTrack('Midnight Reflections', 'Sonic AI v3.5', 'from-[#C10801] to-[#F16001]', 165)">
+          <div class="relative group size-20 shrink-0">
+            <div class="absolute inset-0 brand-gradient rounded-xl opacity-90"></div>
+            <button class="absolute inset-0 flex items-center justify-center text-txt">
+              <span class="material-symbols-outlined text-4xl fill-1">pause_circle</span>
+            </button>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between mb-1">
+              <h4 class="font-bold truncate">Midnight Reflections</h4>
+              <span class="text-xs text-txt-muted">2m 45s</span>
+            </div>
+            <p class="text-txt-muted text-xs mb-3 truncate italic">"A lo-fi hip hop track with melancholic piano..."</p>
+            <div class="flex items-end h-8 gap-[2px]">
+              <div class="waveform-bar h-1/2"></div><div class="waveform-bar h-3/4"></div><div class="waveform-bar h-full"></div><div class="waveform-bar h-2/3"></div><div class="waveform-bar h-1/2"></div><div class="waveform-bar h-4/5"></div><div class="waveform-bar h-full"></div><div class="waveform-bar h-1/3"></div><div class="waveform-bar h-1/2"></div><div class="waveform-bar h-3/4"></div><div class="waveform-bar h-2/3"></div><div class="waveform-bar muted h-1/4"></div><div class="waveform-bar muted h-1/2"></div><div class="waveform-bar muted h-3/4"></div><div class="waveform-bar muted h-1/2"></div><div class="waveform-bar muted h-1/3"></div>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button class="p-2.5 rounded-lg bg-bg border border-border text-txt-muted hover:text-txt hover:border-brand transition-all" onclick="event.stopPropagation(); showToast('Extending track...')"><span class="material-symbols-outlined text-xl">fast_forward</span></button>
+            <button class="p-2.5 rounded-lg bg-bg border border-border text-txt-muted hover:text-txt hover:border-brand transition-all" onclick="event.stopPropagation(); showToast('Downloading...')"><span class="material-symbols-outlined text-xl">download</span></button>
+            <button class="p-2.5 rounded-lg bg-bg border border-border text-txt-muted hover:text-txt hover:border-brand transition-all" onclick="event.stopPropagation(); showToast('Share link copied!')"><span class="material-symbols-outlined text-xl">share</span></button>
+          </div>
+        </div>
+        <div class="bg-panel border border-border rounded-2xl p-5 flex items-center gap-6 hover:border-border-light transition-all opacity-70 hover:opacity-100 cursor-pointer" onclick="playTrack('Neon Pulse Drive', 'Sonic AI v3.5', 'from-amber-500 to-red-500', 90)">
+          <div class="relative group size-20 shrink-0">
+            <div class="absolute inset-0 bg-gradient-to-br from-amber-500 to-red-500 rounded-xl opacity-80"></div>
+            <button class="absolute inset-0 flex items-center justify-center text-txt opacity-0 group-hover:opacity-100 transition-opacity">
+              <span class="material-symbols-outlined text-4xl fill-1">play_circle</span>
+            </button>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between mb-1">
+              <h4 class="font-bold truncate">Neon Pulse Drive</h4>
+              <span class="text-xs text-txt-muted">1m 30s</span>
+            </div>
+            <p class="text-txt-muted text-xs mb-3 truncate italic">"Fast-paced synthwave with driving bassline..."</p>
+            <div class="flex items-end h-8 gap-[2px]">
+              <div class="waveform-bar muted h-1/4"></div><div class="waveform-bar muted h-1/2"></div><div class="waveform-bar muted h-3/4"></div><div class="waveform-bar muted h-1/2"></div><div class="waveform-bar muted h-1/3"></div><div class="waveform-bar muted h-1/2"></div><div class="waveform-bar muted h-2/3"></div><div class="waveform-bar muted h-1/4"></div><div class="waveform-bar muted h-1/2"></div><div class="waveform-bar muted h-3/4"></div>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button class="p-2.5 rounded-lg bg-bg border border-border text-txt-muted hover:text-txt transition-all" onclick="event.stopPropagation(); showToast('Downloading...')"><span class="material-symbols-outlined text-xl">download</span></button>
+            <button class="p-2.5 rounded-lg bg-bg border border-border text-txt-muted hover:text-txt transition-all" onclick="event.stopPropagation(); showToast('More options')"><span class="material-symbols-outlined text-xl">more_vert</span></button>
+          </div>
+        </div>
+      </div>
+      <div class="mt-12 text-center py-20 border-2 border-dashed border-border rounded-3xl">
+        <span class="material-symbols-outlined text-5xl text-txt-dim mb-4 block">library_music</span>
+        <h5 class="text-txt-muted font-medium">Your creative journey starts here.</h5>
+        <p class="text-txt-dim text-sm">Generate your first track to see it in your history.</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+</div>
+
+<!-- ==================== PLAYER BAR ==================== -->
+<footer id="player-bar" class="fixed bottom-0 left-0 right-0 z-50 glass-effect border-t border-border px-6 py-3" style="display:none;">
+  <div class="flex items-center justify-between gap-8">
+    <div class="flex items-center gap-4 w-1/4 min-w-0">
+      <div id="player-art" class="w-14 h-14 rounded-lg bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 shadow-lg flex-shrink-0"></div>
+      <div class="min-w-0">
+        <p id="player-title" class="font-bold text-sm truncate">Midnight Drift</p>
+        <p id="player-artist" class="text-xs text-txt-muted truncate">EchoPulse AI</p>
+      </div>
+      <button id="player-fav" class="ml-2 text-txt-muted hover:text-brand transition-colors" onclick="toggleFavorite(this)">
+        <span class="material-symbols-outlined">favorite</span>
+      </button>
+    </div>
+    <div class="flex-1 max-w-2xl flex flex-col items-center gap-2">
+      <div class="flex items-center gap-6">
+        <button id="btn-shuffle" class="text-txt-muted hover:text-txt transition-colors" onclick="toggleShuffle()"><span class="material-symbols-outlined">shuffle</span></button>
+        <button class="text-txt-muted hover:text-txt transition-colors" onclick="prevTrack()"><span class="material-symbols-outlined">skip_previous</span></button>
+        <button id="btn-play" class="w-12 h-12 rounded-full bg-brand text-txt flex items-center justify-center hover:scale-105 hover:bg-brand-hover transition-all shadow-lg shadow-brand/30" onclick="togglePlayPause()">
+          <span class="material-symbols-outlined text-[32px] fill-1">pause</span>
+        </button>
+        <button class="text-txt-muted hover:text-txt transition-colors" onclick="nextTrack()"><span class="material-symbols-outlined">skip_next</span></button>
+        <button id="btn-repeat" class="text-txt-muted hover:text-txt transition-colors" onclick="toggleRepeat()"><span class="material-symbols-outlined">repeat</span></button>
+      </div>
+      <div class="w-full flex items-center gap-3">
+        <span id="player-current-time" class="text-[10px] font-mono text-txt-dim w-8 text-right">0:00</span>
+        <div class="flex-1 h-1.5 bg-dk-gray rounded-full overflow-hidden progress-track relative cursor-pointer" onclick="seekTo(event)">
+          <div id="player-progress" class="h-full bg-brand relative" style="width:0%">
+            <div class="progress-handle"></div>
+          </div>
+        </div>
+        <span id="player-total-time" class="text-[10px] font-mono text-txt-dim w-8">0:00</span>
+      </div>
+    </div>
+    <div class="flex items-center justify-end gap-4 w-1/4">
+      <button class="text-txt-muted hover:text-txt" onclick="showToast('Lyrics coming soon')"><span class="material-symbols-outlined text-[20px]">lyrics</span></button>
+      <button class="text-txt-muted hover:text-txt" onclick="showToast('Queue coming soon')"><span class="material-symbols-outlined text-[20px]">queue_music</span></button>
+      <div class="flex items-center gap-2">
+        <button onclick="toggleMute()" class="text-txt-muted hover:text-txt"><span id="volume-icon" class="material-symbols-outlined text-[20px]">volume_up</span></button>
+        <input id="volume-slider" type="range" min="0" max="100" value="66" class="w-20" oninput="setVolume(this.value)"/>
+      </div>
+      <button class="text-txt-muted hover:text-txt" onclick="showToast('Fullscreen player coming soon')"><span class="material-symbols-outlined text-[20px]">open_in_full</span></button>
+    </div>
+  </div>
+</footer>
+
+</div>
+
+<div id="toast" class="toast"></div>
+
+<div id="share-modal" class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="bg-panel border border-border rounded-2xl p-8 w-full max-w-md animate-fadeIn">
+    <h3 class="text-xl font-bold mb-4">Share Track</h3>
+    <div class="flex gap-2 mb-6">
+      <input id="share-link" class="flex-1 bg-bg border border-border rounded-lg px-4 py-2 text-sm text-txt" value="https://studioai.app/track/midnight-drift" readonly/>
+      <button class="bg-brand text-txt px-4 py-2 rounded-lg text-sm font-bold" onclick="copyShareLink()">Copy</button>
+    </div>
+    <button class="text-txt-muted text-sm hover:text-txt" onclick="closeModal()">Close</button>
+  </div>
+</div>
+
+<script>
+const state = {
+  currentPage: 'home', isPlaying: false, currentTrack: null,
+  currentTime: 0, totalTime: 0, volume: 66, isMuted: false,
+  shuffle: false, repeat: false, progressInterval: null,
+  libraryFilter: 'all', librarySortOrder: 'recent',
+};
+
+const libraryTracks = [
+  { name: 'Neon Dreams', artist: 'Ambient AI v2.4', date: '2 hours ago', dateVal: 4, genre: 'Synthwave', status: 'public', gradient: 'from-indigo-500 to-purple-600', duration: 225 },
+  { name: 'Cyber Echoes', artist: 'Melodic Engine', date: '5 hours ago', dateVal: 3, genre: 'Ambient', status: 'private', gradient: 'from-cyan-500 to-blue-600', duration: 198 },
+  { name: 'Starlight Groove', artist: 'Retro Rhythm AI', date: 'Yesterday', dateVal: 2, genre: 'Lo-fi', status: 'public', gradient: 'from-orange-400 to-rose-500', duration: 245 },
+  { name: 'Digital Rain', artist: 'Techno Pulse', date: '2 days ago', dateVal: 1, genre: 'Techno', status: 'private', gradient: 'from-emerald-500 to-teal-700', duration: 312 },
+];
+
+function navigateTo(page) {
+  state.currentPage = page;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const target = document.getElementById('page-' + page);
+  if (target) { target.classList.add('active','animate-fadeIn'); setTimeout(() => target.classList.remove('animate-fadeIn'), 300); }
+  document.querySelectorAll('.nav-link').forEach(link => {
+    link.classList.remove('active'); link.classList.add('text-txt-muted');
+    if (link.dataset.page === page) { link.classList.add('active'); link.classList.remove('text-txt-muted'); }
+  });
+  if (page === 'library') renderLibrary();
+}
+
+function formatTime(s) { const m = Math.floor(s/60); const sec = Math.floor(s%60); return m+':'+(sec<10?'0':'')+sec; }
+
+function playTrack(name, artist, gradient, duration) {
+  state.currentTrack = { name, artist, gradient, duration };
+  state.currentTime = 0; state.totalTime = duration; state.isPlaying = true;
+  document.getElementById('player-bar').style.display = 'block';
+  document.getElementById('player-title').textContent = name;
+  document.getElementById('player-artist').textContent = artist;
+  document.getElementById('player-art').className = 'w-14 h-14 rounded-lg bg-gradient-to-br ' + gradient + ' shadow-lg flex-shrink-0';
+  document.getElementById('player-total-time').textContent = formatTime(duration);
+  document.getElementById('player-current-time').textContent = '0:00';
+  document.getElementById('player-progress').style.width = '0%';
+  updatePlayButton(); startProgress();
+}
+
+function togglePlayPause() { if (!state.currentTrack) return; state.isPlaying = !state.isPlaying; updatePlayButton(); state.isPlaying ? startProgress() : stopProgress(); }
+function updatePlayButton() { document.querySelector('#btn-play .material-symbols-outlined').textContent = state.isPlaying ? 'pause' : 'play_arrow'; }
+
+function startProgress() {
+  stopProgress();
+  state.progressInterval = setInterval(() => {
+    if (state.currentTime < state.totalTime) {
+      state.currentTime++;
+      document.getElementById('player-progress').style.width = (state.currentTime/state.totalTime*100)+'%';
+      document.getElementById('player-current-time').textContent = formatTime(state.currentTime);
+    } else { if (state.repeat) state.currentTime=0; else { state.isPlaying=false; updatePlayButton(); stopProgress(); } }
+  }, 1000);
+}
+function stopProgress() { if (state.progressInterval) { clearInterval(state.progressInterval); state.progressInterval=null; } }
+
+function seekTo(e) {
+  if (!state.currentTrack) return;
+  const r=e.currentTarget.getBoundingClientRect(); const p=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
+  state.currentTime=Math.floor(p*state.totalTime);
+  document.getElementById('player-progress').style.width=(p*100)+'%';
+  document.getElementById('player-current-time').textContent=formatTime(state.currentTime);
+}
+
+function nextTrack(){showToast('Next track')} function prevTrack(){showToast('Previous track')}
+function toggleShuffle(){state.shuffle=!state.shuffle;document.getElementById('btn-shuffle').classList.toggle('text-brand',state.shuffle);document.getElementById('btn-shuffle').classList.toggle('text-txt-muted',!state.shuffle);showToast(state.shuffle?'Shuffle on':'Shuffle off')}
+function toggleRepeat(){state.repeat=!state.repeat;document.getElementById('btn-repeat').classList.toggle('text-brand',state.repeat);document.getElementById('btn-repeat').classList.toggle('text-txt-muted',!state.repeat);showToast(state.repeat?'Repeat on':'Repeat off')}
+function setVolume(v){state.volume=parseInt(v);state.isMuted=false;updateVolumeIcon()}
+function toggleMute(){state.isMuted=!state.isMuted;document.getElementById('volume-slider').value=state.isMuted?0:state.volume;updateVolumeIcon()}
+function updateVolumeIcon(){const i=document.getElementById('volume-icon');const v=state.isMuted?0:state.volume;i.textContent=v===0?'volume_off':v<40?'volume_down':'volume_up'}
+
+function renderLibrary() {
+  const tbody=document.getElementById('library-tbody');
+  const search=(document.getElementById('library-search')?.value||'').toLowerCase();
+  let tracks=[...libraryTracks];
+  if(state.libraryFilter==='public')tracks=tracks.filter(t=>t.status==='public');
+  else if(state.libraryFilter==='private')tracks=tracks.filter(t=>t.status==='private');
+  if(search)tracks=tracks.filter(t=>t.name.toLowerCase().includes(search)||t.genre.toLowerCase().includes(search)||t.artist.toLowerCase().includes(search));
+  if(state.librarySortOrder==='recent')tracks.sort((a,b)=>b.dateVal-a.dateVal);
+  else if(state.librarySortOrder==='oldest')tracks.sort((a,b)=>a.dateVal-b.dateVal);
+  else if(state.librarySortOrder==='name')tracks.sort((a,b)=>a.name.localeCompare(b.name));
+  tbody.innerHTML=tracks.map(t=>`
+    <tr class="group hover:bg-surface/40 transition-colors cursor-pointer" onclick="playTrack('${t.name}','${t.artist}','${t.gradient}',${t.duration})">
+      <td class="px-6 py-4"><div class="flex items-center gap-4"><div class="size-12 rounded-lg relative overflow-hidden group/thumb"><div class="absolute inset-0 bg-gradient-to-br ${t.gradient}"></div><div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 bg-black/50 transition-opacity"><span class="material-symbols-outlined text-txt">play_arrow</span></div></div><div><p class="font-bold text-sm">${t.name}</p><p class="text-xs text-txt-muted">${t.artist}</p></div></div></td>
+      <td class="px-6 py-4 text-sm text-txt-muted">${t.date}</td>
+      <td class="px-6 py-4"><span class="px-3 py-1 bg-surface border border-border rounded-full text-xs font-medium text-txt-muted">${t.genre}</span></td>
+      <td class="px-6 py-4 text-center">${t.status==='public'?'<span class="px-3 py-1 badge-public rounded-full text-xs font-bold">Public</span>':'<span class="px-3 py-1 badge-private rounded-full text-xs font-bold">Private</span>'}</td>
+      <td class="px-6 py-4 text-right"><div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity"><button class="p-2 hover:bg-dk-gray rounded-lg transition-colors text-txt-muted" onclick="event.stopPropagation();showToast('Share link copied!')"><span class="material-symbols-outlined text-[20px]">share</span></button><button class="p-2 hover:bg-dk-gray rounded-lg transition-colors text-txt-muted" onclick="event.stopPropagation();showToast('Downloading...')"><span class="material-symbols-outlined text-[20px]">download</span></button><button class="p-2 hover:bg-dk-gray rounded-lg transition-colors text-txt-muted" onclick="event.stopPropagation();showToast('Track options')"><span class="material-symbols-outlined text-[20px]">more_vert</span></button></div></td>
+    </tr>`).join('');
+  if(!tracks.length) tbody.innerHTML='<tr><td colspan="5" class="px-6 py-12 text-center text-txt-muted">No tracks found.</td></tr>';
+}
+
+function filterLibrary(){renderLibrary()}
+function setLibraryFilter(f,btn){state.libraryFilter=f;document.querySelectorAll('.filter-btn').forEach(b=>{b.classList.remove('active');if(!b.classList.contains('bg-surface'))b.classList.add('bg-surface')});btn.classList.add('active');btn.classList.remove('bg-surface');renderLibrary()}
+function setSortOrder(o){state.librarySortOrder=o;document.querySelectorAll('.dropdown').forEach(d=>d.classList.remove('open'));renderLibrary();showToast('Sorted by '+o)}
+function toggleSortDropdown(btn){const dd=btn.querySelector('.dropdown');dd.classList.toggle('open');setTimeout(()=>{const h=e=>{if(!btn.contains(e.target)){dd.classList.remove('open');document.removeEventListener('click',h)}};document.addEventListener('click',h)},10)}
+
+function toggleGenreChip(el){
+  const g=el.dataset.genre;
+  if(g==='all'){document.querySelectorAll('#home-genres .genre-chip').forEach(c=>{c.classList.remove('selected');if(!c.classList.contains('bg-surface'))c.classList.add('bg-surface')});el.classList.add('selected');el.classList.remove('bg-surface')}
+  else{const a=document.querySelector('#home-genres .genre-chip[data-genre="all"]');a.classList.remove('selected');if(!a.classList.contains('bg-surface'))a.classList.add('bg-surface');el.classList.toggle('selected');if(!el.classList.contains('selected')){if(!el.classList.contains('bg-surface'))el.classList.add('bg-surface')}else el.classList.remove('bg-surface')}
+  filterHomeContent();
+}
+function filterHomeContent(){
+  const search=(document.getElementById('home-search')?.value||'').toLowerCase();
+  const sel=[...document.querySelectorAll('#home-genres .genre-chip.selected')].map(c=>c.dataset.genre);
+  const isAll=sel.includes('all')||sel.length===0;
+  document.querySelectorAll('#trending-section .grid > div').forEach(card=>{
+    const t=card.textContent.toLowerCase(); const g=(card.dataset.genres||'').toLowerCase();
+    card.style.display=(!search||t.includes(search))&&(isAll||sel.some(s=>g.includes(s)))?'':'none';
+  });
+}
+
+function toggleCreateGenre(el){
+  el.classList.toggle('selected');
+  if(el.classList.contains('selected')){el.classList.add('border-brand','bg-brand/15','text-brand');el.classList.remove('bg-bg','border-border','text-txt-muted')}
+  else{el.classList.remove('border-brand','bg-brand/15','text-brand');el.classList.add('bg-bg','border-border','text-txt-muted')}
+}
+
+function generateTrack(){
+  const prompt=document.getElementById('create-prompt').value||'AI generated track';
+  const list=document.getElementById('generations-list');
+  const gc=document.createElement('div');
+  gc.className='bg-panel border border-border border-dashed rounded-2xl p-5 flex items-center gap-6 animate-fadeIn';
+  gc.innerHTML=`<div class="size-20 shrink-0 bg-bg rounded-xl flex items-center justify-center"><span class="material-symbols-outlined text-txt-dim animate-spin">refresh</span></div><div class="flex-1"><div class="flex items-center justify-between mb-2"><div class="h-4 w-40 bg-bg rounded animate-pulse"></div><div class="h-4 w-12 bg-bg rounded animate-pulse"></div></div><div class="h-3 w-full bg-bg rounded mb-4 animate-pulse"></div><div class="w-full h-1 bg-bg rounded-full overflow-hidden"><div class="bg-brand h-full animate-pulse" style="width:45%"></div></div></div>`;
+  list.prepend(gc);showToast('Generating track...');
+  setTimeout(()=>{
+    const grads=['from-pink-500 to-violet-600','from-green-400 to-blue-500','from-[#C10801] to-[#F16001]','from-cyan-400 to-indigo-600','from-brand to-orange-400','from-rose-500 to-brand'];
+    const rg=grads[Math.floor(Math.random()*grads.length)];
+    const names=['Crystal Waves','Sunset Boulevard','Digital Dreams','Cosmic Harmony','Electric Soul','Vapor Trail'];
+    const rn=names[Math.floor(Math.random()*names.length)];const dur=90+Math.floor(Math.random()*180);
+    gc.className='bg-panel border border-brand/30 rounded-2xl p-5 flex items-center gap-6 shadow-xl shadow-brand/5 animate-fadeIn cursor-pointer';
+    gc.onclick=()=>playTrack(rn,'Sonic AI v3.5',rg,dur);
+    gc.innerHTML=`<div class="relative group size-20 shrink-0"><div class="absolute inset-0 bg-gradient-to-br ${rg} rounded-xl opacity-80"></div><button class="absolute inset-0 flex items-center justify-center text-txt opacity-0 group-hover:opacity-100 transition-opacity"><span class="material-symbols-outlined text-4xl fill-1">play_circle</span></button></div><div class="flex-1 min-w-0"><div class="flex items-center justify-between mb-1"><h4 class="font-bold truncate">${rn}</h4><span class="text-xs text-txt-muted">${formatTime(dur)}</span></div><p class="text-txt-muted text-xs mb-3 truncate italic">"${prompt.substring(0,50)}..."</p><div class="flex items-end h-8 gap-[2px]">${Array.from({length:16},()=>`<div class="waveform-bar muted" style="height:${20+Math.random()*80}%"></div>`).join('')}</div></div><div class="flex gap-2"><button class="p-2.5 rounded-lg bg-bg border border-border text-txt-muted hover:text-txt hover:border-brand transition-all" onclick="event.stopPropagation();showToast('Downloading...')"><span class="material-symbols-outlined text-xl">download</span></button><button class="p-2.5 rounded-lg bg-bg border border-border text-txt-muted hover:text-txt hover:border-brand transition-all" onclick="event.stopPropagation();showToast('Share link copied!')"><span class="material-symbols-outlined text-xl">share</span></button></div>`;
+    showToast('Track generated!');
+  },3000);
+}
+
+function quickGenerate(){const p=document.getElementById('home-prompt').value;if(p)document.getElementById('create-prompt').value=p;navigateTo('create');if(p)setTimeout(generateTrack,500)}
+
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000)}
+function toggleFavorite(btn){const i=btn.querySelector('.material-symbols-outlined');if(i.classList.contains('fill-1')){i.classList.remove('fill-1');btn.classList.remove('text-brand');btn.classList.add('text-txt-muted');showToast('Removed from favorites')}else{i.classList.add('fill-1');btn.classList.add('text-brand');btn.classList.remove('text-txt-muted');showToast('Added to favorites')}}
+function closeModal(){document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open'))}
+function copyShareLink(){const i=document.getElementById('share-link');i.select();navigator.clipboard?.writeText(i.value);showToast('Link copied!');closeModal()}
+document.addEventListener('click',e=>{if(!e.target.closest('.dropdown')&&!e.target.closest('[onclick*="toggleSortDropdown"]'))document.querySelectorAll('.dropdown').forEach(d=>d.classList.remove('open'))});
+
+navigateTo('home');
+setTimeout(()=>playTrack('Midnight Drift','EchoPulse AI','from-[#C10801] via-[#F16001] to-[#D9C3AB]',222),500);
+</script>
+</body>
+</html>

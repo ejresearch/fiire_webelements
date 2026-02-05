@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FIIRE - Burn out the noise. Ignite your sound.</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        brand: "#E85002",
+        "brand-dark": "#C10801",
+        bg: "#000000",
+        txt: "#F9F9F9",
+        "txt-muted": "#A7A7A7",
+      },
+      fontFamily: {
+        display: ["Space Grotesk", "sans-serif"],
+      },
+    },
+  },
+}
+</script>
+<style>
+html, body { height: 100%; }
+body {
+  font-family: 'Space Grotesk', sans-serif;
+  background: #000;
+  color: #F9F9F9;
+}
+.glow {
+  filter: drop-shadow(0 0 60px rgba(232, 80, 2, 0.4)) drop-shadow(0 0 120px rgba(232, 80, 2, 0.2));
+}
+@keyframes subtle-pulse {
+  0%, 100% { opacity: 1; filter: drop-shadow(0 0 60px rgba(232, 80, 2, 0.4)) drop-shadow(0 0 120px rgba(232, 80, 2, 0.2)); }
+  50% { opacity: 0.95; filter: drop-shadow(0 0 80px rgba(232, 80, 2, 0.5)) drop-shadow(0 0 140px rgba(232, 80, 2, 0.25)); }
+}
+.logo-animate {
+  animation: subtle-pulse 4s ease-in-out infinite;
+}
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in-1 { animation: fade-in-up 1s ease-out 0.2s both; }
+.fade-in-2 { animation: fade-in-up 1s ease-out 0.6s both; }
+.fade-in-3 { animation: fade-in-up 1s ease-out 1s both; }
+
+</style>
+</head>
+<body class="antialiased">
+
+<div class="min-h-screen flex items-center justify-center px-6 relative">
+  <!-- Subtle radial glow behind content -->
+  <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-brand/8 rounded-full blur-[150px] pointer-events-none"></div>
+
+  <!-- Content group - centered as a unit -->
+  <div class="flex flex-col items-center text-center relative z-10">
+    <!-- Logo + Tagline as one unit -->
+    <div class="fade-in-1 flex flex-col items-center">
+      <img src="logo.png" alt="FIIRE" class="h-52 sm:h-64 md:h-80 w-auto logo-animate" />
+      <h1 class="text-base sm:text-lg md:text-xl lg:text-2xl font-medium tracking-tight whitespace-nowrap -mt-2 sm:-mt-3 md:-mt-4">
+        <span class="text-txt-muted">Burn out the noise,</span> <span class="text-txt">ignite your sound.</span>
+      </h1>
+    </div>
+
+  </div>
+</div>
+
+<!-- Intro Section -->
+<section id="intro" class="min-h-screen flex items-center justify-center px-6 py-24 relative">
+  <div class="max-w-3xl mx-auto text-left">
+    <p class="text-txt-muted text-lg sm:text-xl leading-relaxed mb-8">
+      Digging through thousands of samples just to find something that almost works is a thing of the past. FIIRE is built around your sound, using generative AI to create custom, royalty-free music loops and one-shots tailored to your style.
+    </p>
+    <p class="text-txt-muted text-lg sm:text-xl leading-relaxed mb-8">
+      Upload your vision, inspiration, or previous work and hit go. In minutes, FIIRE delivers personalized outputs you can actually use. As you give feedback, your AI agent learns your taste, refining your sound profile and serving up stronger, more relevant options with every iteration, so you stay in the creative flow.
+    </p>
+    <p class="text-txt font-medium text-lg sm:text-xl leading-relaxed">
+      Making great music is trial by FIIRE. Let us help.
+    </p>
+  </div>
+</section>
+
+<!-- Newsletter Section -->
+<section class="min-h-screen flex items-center justify-center px-6 py-24 relative">
+  <div class="max-w-xl mx-auto text-center">
+    <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">Stay in touch!</h2>
+    <p class="text-txt-muted text-lg sm:text-xl mb-8">Sign up for updates and early access</p>
+    <form class="flex flex-col sm:flex-row gap-4">
+      <input
+        type="email"
+        placeholder="your@email.com"
+        class="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-txt placeholder-txt-muted focus:outline-none focus:border-brand transition-colors"
+      />
+      <button
+        type="submit"
+        class="px-6 py-3 bg-brand hover:bg-brand-dark text-white font-medium rounded-lg transition-colors"
+      >
+        Subscribe
+      </button>
+    </form>
+  </div>
+</section>
+
+</body>
+</html>
