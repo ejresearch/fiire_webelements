@@ -3,10 +3,11 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>Studio AI - AI Music Platform</title>
+<title>FIIRE Studio - AI Sample & Loop Generator</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 tailwind.config = {
   theme: {
@@ -33,11 +34,6 @@ tailwind.config = {
 </script>
 <style>
 body { font-family: 'Space Grotesk', sans-serif; background: #000; color: #F9F9F9; }
-.waveform-bar {
-  width: 3px; border-radius: 2px; margin: 0 1px;
-  background-color: #E85002;
-}
-.waveform-bar.muted { background-color: #333; }
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
@@ -49,10 +45,8 @@ body { font-family: 'Space Grotesk', sans-serif; background: #000; color: #F9F9F
 .nav-link { transition: all 0.15s; }
 .nav-link:hover { background: #1A1A1A; }
 .nav-link.active { background: rgba(232, 80, 2, 0.1); color: #E85002; }
-.dropdown { display: none; position: absolute; top: 100%; right: 0; z-index: 50; min-width: 160px; }
-.dropdown.open { display: block; }
 .toast {
-  position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%);
+  position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
   background: linear-gradient(135deg, #E85002, #F16001); color: #F9F9F9;
   padding: 10px 24px; border-radius: 12px;
   font-size: 14px; font-weight: 600; z-index: 100; opacity: 0;
@@ -64,28 +58,75 @@ body { font-family: 'Space Grotesk', sans-serif; background: #000; color: #F9F9F
   z-index: 60; align-items: center; justify-content: center;
 }
 .modal-overlay.open { display: flex; }
-.genre-chip.selected { background: rgba(232, 80, 2, 0.15); border-color: #E85002; color: #E85002; }
-input[type="range"] {
-  -webkit-appearance: none; appearance: none; height: 4px;
-  background: #333; border-radius: 4px; outline: none;
-}
-input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 12px; height: 12px;
-  background: #F9F9F9; border-radius: 50%; cursor: pointer;
-}
-.progress-track { cursor: pointer; }
-.progress-track:hover .progress-handle { opacity: 1; }
-.progress-handle {
-  position: absolute; right: -6px; top: 50%; transform: translateY(-50%);
-  width: 12px; height: 12px; background: #F9F9F9; border-radius: 50%;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.5); opacity: 0; transition: opacity 0.15s;
-}
-.filter-btn.active { background: rgba(232, 80, 2, 0.12); color: #E85002; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .animate-fadeIn { animation: fadeIn 0.25s ease-out; }
-.badge-public { background: rgba(232, 80, 2, 0.12); color: #E85002; }
-.badge-private { background: rgba(249, 249, 249, 0.06); color: #A7A7A7; border: 1px solid rgba(249, 249, 249, 0.08); }
-.brand-gradient { background: linear-gradient(135deg, #000000, #C10801, #F16001, #D9C3AB); }
+
+/* Parameter chips */
+.param-chip {
+  padding: 5px 14px; border-radius: 8px; font-size: 12px; font-weight: 600;
+  border: 1px solid #333; background: #1A1A1A; color: #A7A7A7;
+  cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.param-chip:hover { border-color: #E85002; color: #F9F9F9; }
+.param-chip.active { background: rgba(232, 80, 2, 0.15); border-color: #E85002; color: #E85002; }
+
+/* Variation cards */
+.variation-card { transition: all 0.2s ease; }
+.variation-card:hover { border-color: #444; }
+.variation-card.accepted { border-color: rgba(16, 185, 129, 0.5); background: rgba(16, 185, 129, 0.03); }
+.variation-card.rejected { opacity: 0.4; border-color: rgba(239, 68, 68, 0.3); }
+.variation-card.rejected canvas { filter: grayscale(0.8); }
+.variation-card.playing { border-color: #E85002; box-shadow: 0 0 0 1px #E85002, 0 0 16px rgba(232, 80, 2, 0.15); }
+
+/* Sample cards */
+.sample-card { transition: all 0.2s ease; }
+.sample-card:hover { transform: translateY(-2px); border-color: #444; }
+.sample-card.selected { border-color: #E85002; background: rgba(232, 80, 2, 0.04); }
+
+/* Effects sliders */
+.effect-slider { -webkit-appearance: none; appearance: none; height: 4px; background: #333; border-radius: 4px; outline: none; width: 100%; }
+.effect-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; background: #E85002; border-radius: 50%; cursor: pointer; border: 2px solid #000; }
+
+/* Type badges */
+.badge-loop { background: rgba(232, 80, 2, 0.12); color: #E85002; }
+.badge-oneshot { background: rgba(59, 130, 246, 0.12); color: #3B82F6; }
+
+/* Batch bar */
+.batch-bar { animation: slideUp 0.2s ease-out; }
+@keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* Generation loading */
+@keyframes waveformPulse {
+  0%, 100% { opacity: 0.3; transform: scaleY(0.4); }
+  50% { opacity: 1; transform: scaleY(1); }
+}
+.gen-loading-bar {
+  width: 3px; height: 24px; border-radius: 2px; background: #E85002;
+  display: inline-block; margin: 0 2px;
+  animation: waveformPulse 1.2s ease-in-out infinite;
+}
+.gen-loading-bar:nth-child(2) { animation-delay: 0.1s; }
+.gen-loading-bar:nth-child(3) { animation-delay: 0.2s; }
+.gen-loading-bar:nth-child(4) { animation-delay: 0.3s; }
+.gen-loading-bar:nth-child(5) { animation-delay: 0.4s; }
+.gen-loading-bar:nth-child(6) { animation-delay: 0.5s; }
+.gen-loading-bar:nth-child(7) { animation-delay: 0.6s; }
+.gen-loading-bar:nth-child(8) { animation-delay: 0.7s; }
+
+/* History timeline */
+.history-item { position: relative; padding-left: 32px; }
+.history-item::before { content: ''; position: absolute; left: 11px; top: 32px; bottom: -16px; width: 2px; background: #333; }
+.history-item:last-child::before { display: none; }
+.history-dot { position: absolute; left: 4px; top: 8px; width: 16px; height: 16px; border-radius: 50%; border: 2px solid #333; background: #111; }
+.history-dot.loop { border-color: #E85002; }
+.history-dot.oneshot { border-color: #3B82F6; }
+
+/* Drag */
+[draggable="true"] { cursor: grab; }
+[draggable="true"]:active { cursor: grabbing; opacity: 0.7; }
+
+/* BPM input */
+input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
 </style>
 </head>
 <body class="antialiased">
@@ -93,45 +134,76 @@ input[type="range"]::-webkit-slider-thumb {
 
 <!-- ==================== SIDEBAR ==================== -->
 <aside class="w-64 flex-shrink-0 border-r border-border flex flex-col bg-panel z-10">
-  <div class="p-6 flex items-center cursor-pointer" onclick="navigateTo('home')">
+  <div class="p-6 pb-3 flex items-center cursor-pointer" onclick="navigateTo('dashboard')">
     <img src="logo.png" alt="FIIRE" class="h-16 w-auto" />
   </div>
+
+  <!-- Project Switcher -->
+  <div class="px-4 pb-3 relative">
+    <button id="project-switcher" class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-surface border border-border hover:border-border-light transition-colors text-left" onclick="toggleProjectDropdown()">
+      <div class="w-7 h-7 rounded-lg bg-brand/15 flex items-center justify-center flex-shrink-0">
+        <span class="material-symbols-outlined text-brand text-[16px]">folder</span>
+      </div>
+      <div class="flex-1 min-w-0">
+        <p id="project-name" class="text-sm font-bold truncate">My Project</p>
+        <p id="project-count" class="text-[10px] text-txt-dim">0 samples</p>
+      </div>
+      <span class="material-symbols-outlined text-txt-dim text-[18px] flex-shrink-0" id="project-chevron">expand_more</span>
+    </button>
+
+    <!-- Project dropdown -->
+    <div id="project-dropdown" class="hidden absolute left-4 right-4 top-full mt-1 bg-panel border border-border rounded-xl shadow-2xl shadow-black/50 z-50 overflow-hidden">
+      <div class="max-h-64 overflow-y-auto py-1" id="project-list">
+        <!-- rendered by JS -->
+      </div>
+      <div class="border-t border-border p-2">
+        <div id="new-project-row" class="flex items-center gap-2">
+          <button class="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-brand hover:bg-surface transition-colors font-medium" onclick="showNewProjectInput()">
+            <span class="material-symbols-outlined text-[16px]">add</span> New Project
+          </button>
+        </div>
+        <div id="new-project-input-row" class="hidden flex items-center gap-2">
+          <input id="new-project-input" class="flex-1 bg-bg border border-border rounded-lg px-3 py-1.5 text-sm text-txt placeholder:text-txt-dim" placeholder="Project name..." onkeydown="if(event.key==='Enter')confirmNewProject(); if(event.key==='Escape')cancelNewProject();" />
+          <button class="p-1.5 text-emerald-400 hover:bg-surface rounded-lg" onclick="confirmNewProject()">
+            <span class="material-symbols-outlined text-[16px]">check</span>
+          </button>
+          <button class="p-1.5 text-txt-dim hover:bg-surface rounded-lg" onclick="cancelNewProject()">
+            <span class="material-symbols-outlined text-[16px]">close</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <nav class="flex-1 px-4 py-2 flex flex-col gap-1">
-    <a class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer" data-page="home" onclick="navigateTo('home')">
+    <a class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer" data-page="dashboard" onclick="navigateTo('dashboard')">
       <span class="material-symbols-outlined">home</span>
       <span class="text-sm font-medium">Home</span>
     </a>
+    <a class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer" data-page="generate" onclick="navigateTo('generate')">
+      <span class="material-symbols-outlined">music_note</span>
+      <span class="text-sm font-medium">Studio</span>
+    </a>
     <a class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer" data-page="library" onclick="navigateTo('library')">
       <span class="material-symbols-outlined">library_music</span>
-      <span class="text-sm font-medium">My Library</span>
-    </a>
-    <a class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer" data-page="create" onclick="navigateTo('create')">
-      <span class="material-symbols-outlined">add_circle</span>
-      <span class="text-sm font-medium">Create</span>
-    </a>
-    <a class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg text-txt-muted cursor-pointer" onclick="showToast('Trending page coming soon')">
-      <span class="material-symbols-outlined">trending_up</span>
-      <span class="text-sm font-medium">Trending</span>
+      <span class="text-sm font-medium">Library</span>
     </a>
     <div class="mt-6 mb-3">
-      <p class="px-3 text-[10px] uppercase tracking-widest text-txt-dim font-bold">Playlists</p>
+      <p class="px-3 text-[10px] uppercase tracking-widest text-txt-dim font-bold">Collections</p>
     </div>
-    <a class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg text-txt-muted cursor-pointer" onclick="showToast('Favorites coming soon')">
+    <a class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer" data-page="favorites" onclick="navigateTo('favorites')">
       <span class="material-symbols-outlined">favorite</span>
       <span class="text-sm font-medium">Favorites</span>
     </a>
-    <a class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg text-txt-muted cursor-pointer" onclick="showToast('Playlist created!')">
-      <span class="material-symbols-outlined">add_box</span>
-      <span class="text-sm font-medium">Create Playlist</span>
-    </a>
-    <a class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg text-txt-muted cursor-pointer" onclick="showToast('Opening Neon Vibes 2024')">
-      <span class="text-sm font-medium truncate">Neon Vibes 2024</span>
+    <a class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer" data-page="history" onclick="navigateTo('history')">
+      <span class="material-symbols-outlined">history</span>
+      <span class="text-sm font-medium">Generation History</span>
     </a>
   </nav>
   <div class="p-4 border-t border-border">
-    <button onclick="navigateTo('create')" class="w-full flex items-center justify-center gap-2 py-3 bg-brand hover:bg-brand-hover text-txt rounded-xl font-bold text-sm shadow-lg shadow-brand/20 transition-all">
+    <button onclick="navigateTo('generate')" class="w-full flex items-center justify-center gap-2 py-3 bg-brand hover:bg-brand-hover text-txt rounded-xl font-bold text-sm shadow-lg shadow-brand/20 transition-all">
       <span class="material-symbols-outlined text-[18px]">add</span>
-      New Project
+      New Generation
     </button>
   </div>
 </aside>
@@ -139,416 +211,550 @@ input[type="range"]::-webkit-slider-thumb {
 <!-- ==================== MAIN CONTENT ==================== -->
 <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
 
-<!-- ========== PAGE: HOME ========== -->
-<div id="page-home" class="page flex-col flex-1 overflow-hidden">
+<!-- ========== PAGE: DASHBOARD ========== -->
+<div id="page-dashboard" class="page flex-col flex-1 overflow-hidden">
   <header class="sticky top-0 z-30 flex items-center justify-between px-8 py-4 glass-effect border-b border-border">
-    <div class="flex items-center flex-1 max-w-xl">
+    <div class="flex-1">
       <div class="relative w-full">
         <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-txt-muted">search</span>
-        <input id="home-search" class="w-full bg-surface border border-border rounded-xl pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-brand/50 focus:border-brand text-txt placeholder-txt-dim" placeholder="Search tracks, genres, or artists..." type="text" oninput="filterHomeContent()"/>
+        <input id="dash-search" class="w-full bg-surface border border-border rounded-xl pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-brand/50 focus:border-brand text-txt placeholder-txt-dim" placeholder="Search samples, loops, one-shots..." type="text" oninput="filterDashboard()"/>
       </div>
     </div>
-    <div class="flex items-center gap-4">
-      <button class="p-2 rounded-lg bg-surface border border-border text-txt hover:bg-dk-gray relative transition-colors" onclick="showToast('No new notifications')">
-        <span class="material-symbols-outlined">notifications</span>
+    <div class="flex items-center gap-3 ml-6">
+      <button class="w-9 h-9 rounded-lg bg-surface border border-border text-txt-muted hover:text-txt hover:bg-dk-gray transition-colors flex items-center justify-center" onclick="showToast('No new notifications')">
+        <span class="material-symbols-outlined text-[18px]">notifications</span>
       </button>
-      <button class="p-2 rounded-lg bg-surface border border-border text-txt hover:bg-dk-gray transition-colors" onclick="showToast('Settings coming soon')">
-        <span class="material-symbols-outlined">settings</span>
+      <button class="w-9 h-9 rounded-lg bg-surface border border-border text-txt-muted hover:text-txt hover:bg-dk-gray transition-colors flex items-center justify-center" onclick="showToast('Settings coming soon')">
+        <span class="material-symbols-outlined text-[18px]">settings</span>
       </button>
-      <div class="w-10 h-10 rounded-full bg-brand flex items-center justify-center text-sm font-bold text-txt cursor-pointer" onclick="showToast('Profile settings')">U</div>
+      <div class="w-9 h-9 rounded-full bg-brand flex items-center justify-center text-xs font-bold text-txt cursor-pointer ml-1" onclick="showToast('Profile')">U</div>
     </div>
   </header>
   <main class="flex-1 overflow-y-auto pb-28">
     <div class="px-8 py-6 space-y-8">
-      <!-- Quick Create -->
+      <!-- Quick Generate -->
       <section class="bg-panel rounded-2xl p-6 border border-border">
         <div class="flex gap-4">
           <div class="w-12 h-12 rounded-full bg-brand/15 flex items-center justify-center flex-shrink-0">
             <span class="material-symbols-outlined text-brand font-bold">bolt</span>
           </div>
-          <div class="flex-1 flex flex-col gap-4">
-            <div class="space-y-1">
-              <h2 class="text-lg font-bold">What's the vibe?</h2>
-              <p class="text-sm text-txt-muted">AI will generate a unique track based on your description.</p>
+          <div class="flex-1">
+            <h2 class="text-lg font-bold mb-1">What are you creating?</h2>
+            <p class="text-sm text-txt-muted mb-4">Generate AI-powered samples and loops for your productions.</p>
+            <div class="flex gap-3 flex-wrap">
+              <button class="flex items-center gap-2 bg-brand hover:bg-brand-hover text-txt px-5 py-2.5 rounded-xl text-sm font-bold transition-all" onclick="navigateTo('generate'); setGenerateMode('loop')">
+                <span class="material-symbols-outlined text-[18px]">loop</span>
+                Generate Loop
+              </button>
+              <button class="flex items-center gap-2 bg-surface border border-border text-txt px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-dk-gray transition-colors" onclick="navigateTo('generate'); setGenerateMode('oneshot')">
+                <span class="material-symbols-outlined text-[18px]">radio_button_checked</span>
+                Generate One-Shot
+              </button>
             </div>
-            <div class="relative">
-              <textarea id="home-prompt" class="w-full bg-bg border border-border rounded-xl p-4 text-sm focus:ring-2 focus:ring-brand focus:border-brand text-txt resize-none placeholder-txt-dim" placeholder="A high-energy synthwave track with heavy bass and 80s arcade sound effects..." rows="2"></textarea>
-              <div class="absolute bottom-3 right-3 flex items-center gap-2">
-                <button class="p-1.5 rounded-lg text-txt-dim hover:text-brand transition-colors" onclick="showToast('Voice input coming soon')">
-                  <span class="material-symbols-outlined text-[20px]">mic</span>
-                </button>
-                <button class="p-1.5 rounded-lg text-txt-dim hover:text-brand transition-colors" onclick="navigateTo('create')">
-                  <span class="material-symbols-outlined text-[20px]">tune</span>
-                </button>
-                <button class="bg-brand hover:bg-brand-hover text-txt px-5 py-2 rounded-lg text-sm font-bold transition-all ml-2" onclick="quickGenerate()">
-                  Generate
-                </button>
-              </div>
-            </div>
+            <!-- Recent presets -->
+            <div id="dash-presets" class="flex gap-2 mt-4 flex-wrap"></div>
           </div>
         </div>
       </section>
 
-      <!-- Genre Chips -->
-      <div id="home-genres" class="flex gap-2 overflow-x-auto pb-2">
-        <button class="genre-chip selected px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap border border-transparent transition-all" onclick="toggleGenreChip(this)" data-genre="all">All Moods</button>
-        <button class="genre-chip px-4 py-1.5 bg-surface rounded-full text-sm font-medium whitespace-nowrap border border-border hover:border-brand transition-all text-txt" onclick="toggleGenreChip(this)" data-genre="synthwave">Synthwave</button>
-        <button class="genre-chip px-4 py-1.5 bg-surface rounded-full text-sm font-medium whitespace-nowrap border border-border hover:border-brand transition-all text-txt" onclick="toggleGenreChip(this)" data-genre="lo-fi">Lo-fi</button>
-        <button class="genre-chip px-4 py-1.5 bg-surface rounded-full text-sm font-medium whitespace-nowrap border border-border hover:border-brand transition-all text-txt" onclick="toggleGenreChip(this)" data-genre="cinematic">Cinematic</button>
-        <button class="genre-chip px-4 py-1.5 bg-surface rounded-full text-sm font-medium whitespace-nowrap border border-border hover:border-brand transition-all text-txt" onclick="toggleGenreChip(this)" data-genre="techno">Techno</button>
-        <button class="genre-chip px-4 py-1.5 bg-surface rounded-full text-sm font-medium whitespace-nowrap border border-border hover:border-brand transition-all text-txt" onclick="toggleGenreChip(this)" data-genre="cyberpunk">Cyberpunk</button>
-        <button class="genre-chip px-4 py-1.5 bg-surface rounded-full text-sm font-medium whitespace-nowrap border border-border hover:border-brand transition-all text-txt" onclick="toggleGenreChip(this)" data-genre="acoustic">Acoustic</button>
+      <!-- Type filter chips -->
+      <div id="dash-type-chips" class="flex gap-2 overflow-x-auto pb-2">
+        <button class="param-chip active" onclick="setDashTypeFilter('all', this)" data-type="all">All</button>
+        <button class="param-chip" onclick="setDashTypeFilter('loop', this)" data-type="loop">Loops</button>
+        <button class="param-chip" onclick="setDashTypeFilter('oneshot', this)" data-type="oneshot">One-Shots</button>
       </div>
 
-      <!-- Trending Now -->
-      <section id="trending-section">
-        <div class="flex items-center justify-between mb-6">
-          <h3 class="text-2xl font-bold tracking-tight">Trending Now</h3>
-          <a class="text-sm font-medium text-brand hover:underline cursor-pointer" onclick="showToast('View all trending')">View All</a>
+      <!-- Recent Generations -->
+      <section>
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-xl font-bold">Recent Generations</h3>
+          <a class="text-sm font-medium text-brand hover:underline cursor-pointer" onclick="navigateTo('library')">View All</a>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div class="group bg-panel p-4 rounded-2xl border border-border hover:border-border-light hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer" data-genres="synthwave" onclick="playTrack('Midnight Drift', 'EchoPulse AI', 'from-[#C10801] via-[#F16001] to-[#D9C3AB]', 202)">
-            <div class="relative aspect-square rounded-xl overflow-hidden mb-4 bg-surface">
-              <div class="w-full h-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500"></div>
-              <button class="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
-                <div class="w-14 h-14 bg-brand text-txt rounded-full flex items-center justify-center shadow-lg">
-                  <span class="material-symbols-outlined text-[32px] fill-1">play_arrow</span>
-                </div>
-              </button>
-            </div>
-            <h4 class="font-bold text-base truncate">Midnight Drift</h4>
-            <p class="text-xs text-txt-muted mb-3">by EchoPulse AI</p>
-            <div class="flex flex-wrap gap-1">
-              <span class="px-2 py-0.5 bg-surface border border-border text-[10px] rounded-md text-txt-muted">Synthwave</span>
-              <span class="px-2 py-0.5 bg-surface border border-border text-[10px] rounded-md text-txt-muted">80s</span>
-            </div>
-          </div>
-          <div class="group bg-panel p-4 rounded-2xl border border-border hover:border-border-light hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer" data-genres="ambient" onclick="playTrack('Ethereal Forest', 'LunaGen', 'from-cyan-400 to-blue-600', 234)">
-            <div class="relative aspect-square rounded-xl overflow-hidden mb-4 bg-surface">
-              <div class="w-full h-full bg-gradient-to-bl from-cyan-400 to-blue-600"></div>
-              <button class="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
-                <div class="w-14 h-14 bg-brand text-txt rounded-full flex items-center justify-center shadow-lg">
-                  <span class="material-symbols-outlined text-[32px] fill-1">play_arrow</span>
-                </div>
-              </button>
-            </div>
-            <h4 class="font-bold text-base truncate">Ethereal Forest</h4>
-            <p class="text-xs text-txt-muted mb-3">by LunaGen</p>
-            <div class="flex flex-wrap gap-1">
-              <span class="px-2 py-0.5 bg-surface border border-border text-[10px] rounded-md text-txt-muted">Ambient</span>
-              <span class="px-2 py-0.5 bg-surface border border-border text-[10px] rounded-md text-txt-muted">Chill</span>
-            </div>
-          </div>
-          <div class="group bg-panel p-4 rounded-2xl border border-border hover:border-border-light hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer" data-genres="cinematic" onclick="playTrack('Desert Storm', 'Catalyst', 'from-yellow-400 via-orange-500 to-red-500', 195)">
-            <div class="relative aspect-square rounded-xl overflow-hidden mb-4 bg-surface">
-              <div class="w-full h-full bg-gradient-to-tr from-yellow-400 via-orange-500 to-red-500"></div>
-              <button class="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
-                <div class="w-14 h-14 bg-brand text-txt rounded-full flex items-center justify-center shadow-lg">
-                  <span class="material-symbols-outlined text-[32px] fill-1">play_arrow</span>
-                </div>
-              </button>
-            </div>
-            <h4 class="font-bold text-base truncate">Desert Storm</h4>
-            <p class="text-xs text-txt-muted mb-3">by Catalyst</p>
-            <div class="flex flex-wrap gap-1">
-              <span class="px-2 py-0.5 bg-surface border border-border text-[10px] rounded-md text-txt-muted">Industrial</span>
-              <span class="px-2 py-0.5 bg-surface border border-border text-[10px] rounded-md text-txt-muted">Dark</span>
-            </div>
-          </div>
-          <div class="group bg-panel p-4 rounded-2xl border border-border hover:border-border-light hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer" data-genres="lo-fi acoustic" onclick="playTrack('Morning Dew', 'SereneAI', 'from-emerald-400 to-cyan-400', 178)">
-            <div class="relative aspect-square rounded-xl overflow-hidden mb-4 bg-surface">
-              <div class="w-full h-full bg-gradient-to-r from-emerald-400 to-cyan-400"></div>
-              <button class="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
-                <div class="w-14 h-14 bg-brand text-txt rounded-full flex items-center justify-center shadow-lg">
-                  <span class="material-symbols-outlined text-[32px] fill-1">play_arrow</span>
-                </div>
-              </button>
-            </div>
-            <h4 class="font-bold text-base truncate">Morning Dew</h4>
-            <p class="text-xs text-txt-muted mb-3">by SereneAI</p>
-            <div class="flex flex-wrap gap-1">
-              <span class="px-2 py-0.5 bg-surface border border-border text-[10px] rounded-md text-txt-muted">Lo-fi</span>
-              <span class="px-2 py-0.5 bg-surface border border-border text-[10px] rounded-md text-txt-muted">Jazz</span>
-            </div>
-          </div>
+        <div id="dash-recent-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <!-- rendered by JS -->
+        </div>
+        <div id="dash-empty" class="hidden text-center py-16 border-2 border-dashed border-border rounded-2xl">
+          <span class="material-symbols-outlined text-4xl text-txt-dim mb-3 block">library_music</span>
+          <p class="text-txt-muted font-medium">No samples yet</p>
+          <p class="text-txt-dim text-sm">Generate your first loop or one-shot to get started.</p>
         </div>
       </section>
 
-      <!-- New Drops -->
-      <section id="drops-section">
-        <div class="flex items-center justify-between mb-6">
-          <h3 class="text-2xl font-bold tracking-tight">New Drops</h3>
-          <a class="text-sm font-medium text-brand hover:underline cursor-pointer">See Newest</a>
+      <!-- Recommendations -->
+      <section id="dash-recommendations" class="hidden">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-xl font-bold">Recommended For You</h3>
+            <p class="text-sm text-txt-muted">Based on your accept/reject history</p>
+          </div>
         </div>
-        <div class="space-y-2">
-          <div class="group flex items-center gap-4 p-3 rounded-xl hover:bg-panel border border-transparent hover:border-border transition-all cursor-pointer" onclick="playTrack('Cybernetic Pulse', 'User_9921', 'from-purple-800 to-indigo-900', 222)">
-            <div class="w-12 h-12 rounded-lg overflow-hidden bg-surface">
-              <div class="w-full h-full bg-gradient-to-br from-purple-800 to-indigo-900"></div>
-            </div>
-            <div class="flex-1 min-w-0">
-              <h5 class="font-bold text-sm truncate">Cybernetic Pulse</h5>
-              <p class="text-[10px] text-txt-muted">User_9921</p>
-            </div>
-            <span class="text-xs text-txt-dim hidden md:block">2 mins ago</span>
-            <span class="text-xs text-txt-dim font-mono">3:42</span>
-            <button class="text-txt-muted hover:text-brand" onclick="event.stopPropagation(); toggleFavorite(this)">
-              <span class="material-symbols-outlined text-[20px]">favorite</span>
-            </button>
-            <button class="text-txt-muted hover:text-brand" onclick="event.stopPropagation(); showToast('More options')">
-              <span class="material-symbols-outlined text-[20px]">more_horiz</span>
-            </button>
-          </div>
-          <div class="group flex items-center gap-4 p-3 rounded-xl hover:bg-panel border border-transparent hover:border-border transition-all cursor-pointer" onclick="playTrack('Neon Tears', 'SynthQueen', 'from-pink-500 to-rose-400', 178)">
-            <div class="w-12 h-12 rounded-lg overflow-hidden bg-surface">
-              <div class="w-full h-full bg-gradient-to-tr from-pink-500 to-rose-400"></div>
-            </div>
-            <div class="flex-1 min-w-0">
-              <h5 class="font-bold text-sm truncate">Neon Tears</h5>
-              <p class="text-[10px] text-txt-muted">SynthQueen</p>
-            </div>
-            <span class="text-xs text-txt-dim hidden md:block">5 mins ago</span>
-            <span class="text-xs text-txt-dim font-mono">2:58</span>
-            <button class="text-txt-muted hover:text-brand" onclick="event.stopPropagation(); toggleFavorite(this)">
-              <span class="material-symbols-outlined text-[20px]">favorite</span>
-            </button>
-            <button class="text-txt-muted hover:text-brand" onclick="event.stopPropagation(); showToast('More options')">
-              <span class="material-symbols-outlined text-[20px]">more_horiz</span>
-            </button>
-          </div>
+        <div id="dash-rec-list" class="space-y-2"></div>
+      </section>
+      <section id="dash-rec-locked" class="">
+        <div class="bg-panel rounded-2xl p-6 border border-border text-center">
+          <span class="material-symbols-outlined text-3xl text-txt-dim mb-2 block">auto_awesome</span>
+          <p class="text-txt-muted font-medium text-sm">Personalized recommendations unlock after 50+ sample decisions</p>
+          <p class="text-txt-dim text-xs mt-1"><span id="dash-decision-count">0</span> / 50 decisions made</p>
         </div>
       </section>
     </div>
   </main>
+</div>
+
+<!-- ========== PAGE: STUDIO ========== -->
+<div id="page-generate" class="page flex-col flex-1 overflow-hidden">
+
+  <!-- ===== TOP: Compact Generation Bar ===== -->
+  <div class="bg-panel border-b border-border flex-shrink-0">
+    <!-- Row 1: Mode toggle + core params + generate button -->
+    <div class="flex items-center gap-5 px-8 py-4">
+      <!-- Mode toggle -->
+      <div class="flex h-10 items-center rounded-xl bg-bg p-0.5 border border-border flex-shrink-0">
+        <label class="flex cursor-pointer h-full items-center justify-center rounded-lg px-4 has-[:checked]:bg-surface has-[:checked]:text-txt text-txt-dim text-sm font-medium transition-all">
+          <span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px]">loop</span> Loop</span>
+          <input checked name="gen-mode" type="radio" value="loop" class="hidden" onchange="setGenerateMode('loop')"/>
+        </label>
+        <label class="flex cursor-pointer h-full items-center justify-center rounded-lg px-4 has-[:checked]:bg-surface has-[:checked]:text-txt text-txt-dim text-sm font-medium transition-all">
+          <span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px]">radio_button_checked</span> One-Shot</span>
+          <input name="gen-mode" type="radio" value="oneshot" class="hidden" onchange="setGenerateMode('oneshot')"/>
+        </label>
+      </div>
+
+      <div class="w-px h-8 bg-border flex-shrink-0"></div>
+
+      <!-- Loop params (inline) -->
+      <div id="loop-params" class="flex items-center gap-4 flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <span class="text-xs text-txt-dim uppercase font-bold tracking-wide">BPM</span>
+          <input type="number" id="bpm-input" min="60" max="200" value="120" class="w-16 bg-bg border border-border rounded-lg px-2.5 py-2 text-sm text-center text-txt" oninput="document.getElementById('bpm-slider').value=this.value"/>
+          <input type="range" id="bpm-slider" min="60" max="200" value="120" class="w-28 effect-slider" oninput="document.getElementById('bpm-input').value=this.value"/>
+        </div>
+
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <span class="text-xs text-txt-dim uppercase font-bold tracking-wide">Key</span>
+          <select id="key-select" class="bg-bg border border-border rounded-lg px-3 py-2 text-sm text-txt">
+            <option>C</option><option>Cm</option><option>C#</option><option>C#m</option>
+            <option>D</option><option>Dm</option><option>D#</option><option>D#m</option>
+            <option>E</option><option>Em</option>
+            <option>F</option><option>Fm</option><option>F#</option><option>F#m</option>
+            <option>G</option><option>Gm</option><option>G#</option><option>G#m</option>
+            <option>A</option><option>Am</option><option>A#</option><option>A#m</option>
+            <option>B</option><option>Bm</option>
+          </select>
+        </div>
+
+        <div id="length-chips" class="flex gap-1.5 flex-shrink-0">
+          <button class="param-chip text-xs" onclick="setLength(2, this)">2 bars</button>
+          <button class="param-chip active text-xs" onclick="setLength(4, this)">4 bars</button>
+          <button class="param-chip text-xs" onclick="setLength(8, this)">8 bars</button>
+          <button class="param-chip text-xs" onclick="setLength(16, this)">16 bars</button>
+        </div>
+      </div>
+
+      <!-- One-shot params (inline, hidden by default) -->
+      <div id="oneshot-params" class="hidden items-center gap-4 flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <span class="text-xs text-txt-dim uppercase font-bold tracking-wide">Tuning</span>
+          <select id="tuning-select" class="bg-bg border border-border rounded-lg px-3 py-2 text-sm text-txt">
+            <option>C2</option><option>C3</option><option>C4</option><option>C5</option>
+            <option>D3</option><option>D4</option><option>E3</option><option>E4</option>
+            <option>F3</option><option>F4</option><option>G3</option><option>G4</option>
+            <option>A3</option><option>A4</option><option>B3</option><option>B4</option>
+          </select>
+        </div>
+        <div id="attack-chips" class="flex gap-1.5 flex-shrink-0">
+          <button class="param-chip active text-xs" onclick="toggleChip(this, 'attack-chips')">Snappy</button>
+          <button class="param-chip text-xs" onclick="toggleChip(this, 'attack-chips')">Soft</button>
+          <button class="param-chip text-xs" onclick="toggleChip(this, 'attack-chips')">Transient</button>
+          <button class="param-chip text-xs" onclick="toggleChip(this, 'attack-chips')">Punchy</button>
+        </div>
+        <div id="timbre-chips" class="flex gap-1.5 flex-shrink-0">
+          <button class="param-chip active text-xs" onclick="toggleChip(this, 'timbre-chips')">Warm</button>
+          <button class="param-chip text-xs" onclick="toggleChip(this, 'timbre-chips')">Bright</button>
+          <button class="param-chip text-xs" onclick="toggleChip(this, 'timbre-chips')">Dark</button>
+          <button class="param-chip text-xs" onclick="toggleChip(this, 'timbre-chips')">Metallic</button>
+        </div>
+      </div>
+
+      <div class="w-px h-8 bg-border flex-shrink-0"></div>
+
+      <!-- Variations + Generate -->
+      <div class="flex items-center gap-3 flex-shrink-0 ml-auto">
+        <span class="text-xs text-txt-dim uppercase font-bold tracking-wide whitespace-nowrap">Vars</span>
+        <select id="var-slider" class="bg-bg border border-border rounded-lg px-3 py-2 text-sm text-txt" onchange="updateGenBtnText()">
+          <option value="4">4</option><option value="6" selected>6</option><option value="8">8</option>
+        </select>
+        <select id="model-select" class="bg-bg border border-border rounded-lg px-3 py-2 text-sm text-txt whitespace-nowrap">
+          <option>Sonic v3.5</option><option>Sonic v3.0</option><option>Sonic v2.0</option>
+        </select>
+        <button id="gen-btn" class="bg-brand hover:bg-brand-hover text-txt font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 text-sm transition-all shadow-lg shadow-brand/20 whitespace-nowrap" onclick="generateSamples()">
+          <span class="material-symbols-outlined text-[18px]">bolt</span>
+          <span id="gen-btn-text">Generate</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Row 2: Style chips + optional prompt -->
+    <div class="flex items-center gap-4 px-8 pb-4">
+      <div id="style-chips" class="flex gap-2 flex-wrap flex-1">
+        <button class="param-chip text-xs" onclick="toggleMultiChip(this)">Dusty</button>
+        <button class="param-chip text-xs" onclick="toggleMultiChip(this)">Clean</button>
+        <button class="param-chip text-xs" onclick="toggleMultiChip(this)">Analog</button>
+        <button class="param-chip text-xs" onclick="toggleMultiChip(this)">Digital</button>
+        <button class="param-chip text-xs" onclick="toggleMultiChip(this)">Lo-fi</button>
+        <button class="param-chip text-xs" onclick="toggleMultiChip(this)">Punchy</button>
+        <button class="param-chip text-xs" onclick="toggleMultiChip(this)">Atmospheric</button>
+        <button class="param-chip text-xs" onclick="toggleMultiChip(this)">Vintage</button>
+        <button class="param-chip text-xs" onclick="toggleMultiChip(this)">Crispy</button>
+      </div>
+      <div class="w-px h-7 bg-border flex-shrink-0"></div>
+      <div class="relative flex-shrink-0 w-80">
+        <input id="gen-prompt" class="w-full bg-bg border border-border rounded-lg px-4 py-2 text-sm text-txt placeholder:text-txt-dim" placeholder="Describe your sound (optional)..." type="text"/>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== BOTTOM: Workspace grid + Inspector ===== -->
+  <div class="flex flex-1 min-h-0 overflow-hidden">
+    <!-- Main workspace area -->
+    <main id="gen-center" class="flex-1 bg-bg flex flex-col min-w-0 overflow-hidden">
+      <!-- Workspace toolbar -->
+      <div class="flex items-center justify-between px-8 py-4">
+        <div class="flex items-center gap-4">
+          <h3 class="text-base font-bold text-txt">Workspace</h3>
+          <div class="flex gap-2">
+            <button class="param-chip active text-xs" onclick="setWsFilter('all', this)" id="ws-filter-all">All</button>
+            <button class="param-chip text-xs" onclick="setWsFilter('pending', this)">Pending</button>
+            <button class="param-chip text-xs" onclick="setWsFilter('accepted', this)">Accepted</button>
+            <button class="param-chip text-xs" onclick="setWsFilter('rejected', this)">Rejected</button>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="relative">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-txt-dim text-[18px]">search</span>
+            <input id="ws-search" class="bg-surface border border-border rounded-lg pl-9 pr-4 py-2 text-sm text-txt placeholder-txt-dim w-52" placeholder="Search workspace..." oninput="renderVariations()"/>
+          </div>
+          <select id="ws-sort" class="bg-surface border border-border rounded-lg px-3 py-2 text-sm text-txt" onchange="renderVariations()">
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+            <option value="name">Name</option>
+          </select>
+          <button class="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-txt px-4 py-2 rounded-lg text-sm font-bold transition-colors" onclick="acceptAllPending()">
+            <span class="material-symbols-outlined text-[16px]">check</span> Accept All
+          </button>
+        </div>
+      </div>
+
+      <!-- Loading state -->
+      <div id="gen-loading" class="hidden flex flex-col items-center justify-center py-16">
+        <div class="flex items-end gap-[2px] mb-4">
+          <span class="gen-loading-bar"></span><span class="gen-loading-bar"></span><span class="gen-loading-bar"></span>
+          <span class="gen-loading-bar"></span><span class="gen-loading-bar"></span><span class="gen-loading-bar"></span>
+          <span class="gen-loading-bar"></span><span class="gen-loading-bar"></span>
+        </div>
+        <p class="text-txt-muted font-medium text-sm">Generating variations...</p>
+        <p class="text-txt-dim text-xs mt-1">This usually takes 5-10 seconds</p>
+      </div>
+
+      <!-- Workspace grid / stack -->
+      <div class="flex-1 overflow-y-auto px-6 pb-28">
+        <div id="var-grid"></div>
+
+        <!-- Empty state -->
+        <div id="gen-empty" class="text-center py-16">
+          <span class="material-symbols-outlined text-5xl text-txt-dim mb-4 block">music_note</span>
+          <h5 class="text-txt-muted font-medium">Your studio workspace</h5>
+          <p class="text-txt-dim text-sm mt-1">Set parameters above and hit Generate to fill this space.</p>
+        </div>
+
+        <!-- Footer -->
+        <div id="gen-footer" class="hidden flex items-center justify-between pt-4 pb-2">
+          <span id="gen-var-count" class="text-xs text-txt-dim">6 samples</span>
+        </div>
+      </div>
+    </main>
+
+    <!-- Right panel: Sample Inspector -->
+    <aside id="inspector-panel" class="w-[320px] bg-panel border-l border-border flex-col h-full overflow-y-auto flex-shrink-0" style="display:none;">
+      <div class="relative">
+        <button class="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center text-txt transition-colors" onclick="closeInspector()">
+          <span class="material-symbols-outlined text-[16px]">close</span>
+        </button>
+        <div class="p-3 bg-bg">
+          <canvas id="inspector-waveform" class="w-full h-28 rounded-lg"></canvas>
+        </div>
+      </div>
+      <div class="p-4 space-y-4">
+        <!-- Sample info -->
+        <div>
+          <h3 id="inspector-title" class="text-base font-bold">Variation 1</h3>
+          <div class="flex items-center gap-2 mt-1">
+            <span id="inspector-type-badge" class="px-2 py-0.5 rounded text-[10px] font-bold uppercase badge-loop">Loop</span>
+            <span id="inspector-meta" class="text-xs text-txt-muted">120 BPM / Cm / 4 bars</span>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center gap-1.5">
+          <button class="flex items-center gap-1 bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs hover:bg-dk-gray transition-colors" onclick="playSampleFromInspector()">
+            <span class="material-symbols-outlined text-[16px] fill-1" id="inspector-play-icon">play_arrow</span> Play
+          </button>
+          <button id="inspector-loop-btn" class="flex items-center gap-1 bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs hover:bg-dk-gray transition-colors text-txt-muted" onclick="toggleLoopPlayback()">
+            <span class="material-symbols-outlined text-[16px]">loop</span>
+          </button>
+          <button class="bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs hover:bg-dk-gray transition-colors" onclick="downloadSample(state.inspectedSample)">
+            <span class="material-symbols-outlined text-[16px]">download</span>
+          </button>
+          <button class="bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs hover:bg-dk-gray transition-colors" onclick="toggleSampleFavorite(state.inspectedSample)">
+            <span class="material-symbols-outlined text-[16px]" id="inspector-fav-icon">favorite</span>
+          </button>
+          <button class="ml-auto bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs hover:bg-dk-gray transition-colors" onclick="batchFromSample()">
+            <span class="material-symbols-outlined text-[16px]">auto_awesome</span>
+          </button>
+        </div>
+
+        <!-- Effects -->
+        <div>
+          <h4 class="text-[10px] font-semibold text-txt-muted uppercase tracking-wider mb-2">Effects</h4>
+          <div class="space-y-2">
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] text-txt-muted w-16">Distortion</span>
+              <input type="range" min="0" max="100" value="0" class="flex-1 effect-slider" data-fx="distortion" oninput="updateEffect(this)"/>
+              <span class="text-[10px] text-txt-dim w-7 text-right fx-val">0%</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] text-txt-muted w-16">Reverb</span>
+              <input type="range" min="0" max="100" value="0" class="flex-1 effect-slider" data-fx="reverb" oninput="updateEffect(this)"/>
+              <span class="text-[10px] text-txt-dim w-7 text-right fx-val">0%</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] text-txt-muted w-16">Delay</span>
+              <input type="range" min="0" max="100" value="0" class="flex-1 effect-slider" data-fx="delay" oninput="updateEffect(this)"/>
+              <span class="text-[10px] text-txt-dim w-7 text-right fx-val">0%</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] text-txt-muted w-16">Filter LP</span>
+              <input type="range" min="0" max="100" value="100" class="flex-1 effect-slider" data-fx="filterLP" oninput="updateEffect(this)"/>
+              <span class="text-[10px] text-txt-dim w-7 text-right fx-val">100%</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] text-txt-muted w-16">Bitcrush</span>
+              <input type="range" min="0" max="100" value="0" class="flex-1 effect-slider" data-fx="bitcrush" oninput="updateEffect(this)"/>
+              <span class="text-[10px] text-txt-dim w-7 text-right fx-val">0%</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] text-txt-muted w-16">Saturation</span>
+              <input type="range" min="0" max="100" value="0" class="flex-1 effect-slider" data-fx="saturation" oninput="updateEffect(this)"/>
+              <span class="text-[10px] text-txt-dim w-7 text-right fx-val">0%</span>
+            </div>
+          </div>
+          <div class="flex gap-2 mt-2">
+            <button class="flex-1 text-[10px] text-txt-muted hover:text-txt border border-border rounded-lg py-1.5 hover:bg-surface transition-colors" onclick="resetEffects()">Reset</button>
+            <button class="flex-1 text-[10px] text-txt font-bold bg-brand hover:bg-brand-hover rounded-lg py-1.5 transition-colors" onclick="applyEffects()">Apply & Save</button>
+          </div>
+        </div>
+
+        <!-- Tags -->
+        <div>
+          <h4 class="text-[10px] font-semibold text-txt-muted uppercase tracking-wider mb-1.5">Tags</h4>
+          <div id="inspector-tags" class="flex flex-wrap gap-1"></div>
+        </div>
+
+        <!-- Notes -->
+        <div>
+          <h4 class="text-[10px] font-semibold text-txt-muted uppercase tracking-wider mb-1.5">Notes</h4>
+          <textarea id="inspector-notes" class="w-full h-14 rounded-lg bg-bg border border-border focus:border-brand focus:ring-1 focus:ring-brand p-2 text-txt text-[11px] resize-none placeholder:text-txt-dim" placeholder="Add notes..." oninput="updateSampleNotes()"></textarea>
+        </div>
+      </div>
+    </aside>
+  </div>
 </div>
 
 <!-- ========== PAGE: LIBRARY ========== -->
 <div id="page-library" class="page flex-col flex-1 overflow-hidden">
-  <header class="flex flex-wrap items-center justify-between gap-4 p-8">
-    <div class="flex flex-col gap-1">
-      <h2 class="text-4xl font-black tracking-tight">My Creations</h2>
-      <p class="text-txt-muted">Manage and organize your AI-generated tracks.</p>
+  <header class="flex flex-wrap items-center justify-between gap-4 px-8 pt-6 pb-4">
+    <div>
+      <h2 class="text-3xl font-black tracking-tight">Sample Library</h2>
+      <p class="text-txt-muted text-sm">Your accepted samples and loops.</p>
     </div>
     <div class="flex items-center gap-3">
-      <button class="flex items-center gap-2 bg-surface text-txt px-4 py-2 rounded-lg text-sm font-bold border border-border hover:bg-dk-gray transition-colors" onclick="showToast('Import feature coming soon')">
-        <span class="material-symbols-outlined text-[20px]">cloud_upload</span>
-        Import
+      <button class="flex items-center gap-2 bg-surface text-txt px-4 py-2 rounded-lg text-sm font-bold border border-border hover:bg-dk-gray transition-colors" onclick="openImportModal()">
+        <span class="material-symbols-outlined text-[18px]">upload</span> Import
       </button>
-      <button class="flex items-center gap-2 bg-brand hover:bg-brand-hover text-txt px-4 py-2 rounded-lg text-sm font-bold shadow-lg shadow-brand/20 transition-all" onclick="navigateTo('create')">
-        <span class="material-symbols-outlined text-[20px]">magic_button</span>
-        Generate New Track
+      <button class="flex items-center gap-2 bg-brand hover:bg-brand-hover text-txt px-4 py-2 rounded-lg text-sm font-bold transition-all" onclick="navigateTo('generate')">
+        <span class="material-symbols-outlined text-[18px]">magic_button</span> Generate New
       </button>
     </div>
   </header>
-  <div class="px-8 mb-4 space-y-4">
-    <div class="flex flex-col md:flex-row gap-4 items-center">
-      <div class="flex-1 w-full">
-        <label class="relative block">
-          <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-txt-muted">
-            <span class="material-symbols-outlined">search</span>
-          </span>
-          <input id="library-search" class="w-full bg-surface border border-border rounded-lg py-3 pl-12 pr-4 text-sm focus:ring-2 focus:ring-brand focus:border-brand placeholder:text-txt-dim text-txt" placeholder="Search your library..." type="text" oninput="filterLibrary()"/>
-        </label>
-      </div>
-      <div class="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
-        <button class="filter-btn active flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap" onclick="setLibraryFilter('all', this)">All Tracks</button>
-        <button class="filter-btn flex items-center gap-2 bg-surface border border-border px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-txt" onclick="setLibraryFilter('public', this)">Public</button>
-        <button class="filter-btn flex items-center gap-2 bg-surface border border-border px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-txt" onclick="setLibraryFilter('private', this)">Private</button>
-        <button class="filter-btn flex items-center gap-2 bg-surface border border-border px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap relative text-txt" onclick="toggleSortDropdown(this)">
-          Recent <span class="material-symbols-outlined text-sm">expand_more</span>
-          <div class="dropdown bg-panel border border-border rounded-lg mt-1 py-1 shadow-xl">
-            <div class="px-4 py-2 hover:bg-surface text-sm cursor-pointer" onclick="event.stopPropagation(); setSortOrder('recent')">Recent</div>
-            <div class="px-4 py-2 hover:bg-surface text-sm cursor-pointer" onclick="event.stopPropagation(); setSortOrder('oldest')">Oldest</div>
-            <div class="px-4 py-2 hover:bg-surface text-sm cursor-pointer" onclick="event.stopPropagation(); setSortOrder('name')">Name A-Z</div>
-          </div>
-        </button>
-      </div>
+  <!-- Filters -->
+  <div class="px-8 pb-4 flex flex-wrap items-center gap-3">
+    <div class="relative flex-1 max-w-xs">
+      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-txt-dim text-[20px]">search</span>
+      <input id="lib-search" class="w-full bg-surface border border-border rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-brand/50 focus:border-brand text-txt placeholder-txt-dim" placeholder="Search library..." type="text" oninput="renderLibrary()"/>
+    </div>
+    <div class="flex gap-2">
+      <button class="param-chip active text-[11px]" onclick="setLibType('all', this)">All</button>
+      <button class="param-chip text-[11px]" onclick="setLibType('loop', this)">Loops</button>
+      <button class="param-chip text-[11px]" onclick="setLibType('oneshot', this)">One-Shots</button>
+    </div>
+    <select id="lib-key-filter" class="bg-surface border border-border rounded-lg px-3 py-2 text-sm text-txt" onchange="renderLibrary()">
+      <option value="all">All Keys</option>
+      <option>C</option><option>Cm</option><option>D</option><option>Dm</option><option>E</option><option>Em</option>
+      <option>F</option><option>Fm</option><option>G</option><option>Gm</option><option>A</option><option>Am</option><option>B</option><option>Bm</option>
+    </select>
+    <select id="lib-sort" class="bg-surface border border-border rounded-lg px-3 py-2 text-sm text-txt" onchange="renderLibrary()">
+      <option value="recent">Newest</option>
+      <option value="oldest">Oldest</option>
+      <option value="name">Name A-Z</option>
+      <option value="bpm">BPM</option>
+    </select>
+    <div class="flex gap-1 ml-auto">
+      <button id="lib-grid-btn" class="p-2 rounded-lg bg-surface border border-border text-brand" onclick="setLibView('grid')">
+        <span class="material-symbols-outlined text-[18px]">grid_view</span>
+      </button>
+      <button id="lib-list-btn" class="p-2 rounded-lg text-txt-muted hover:text-txt hover:bg-surface transition-colors" onclick="setLibView('list')">
+        <span class="material-symbols-outlined text-[18px]">view_list</span>
+      </button>
     </div>
   </div>
+  <!-- Content -->
   <div class="flex-1 overflow-auto px-8 pb-32">
-    <div class="bg-panel rounded-xl border border-border overflow-hidden">
+    <div id="lib-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"></div>
+    <div id="lib-list" class="hidden bg-panel rounded-xl border border-border overflow-hidden">
       <table class="w-full text-left border-collapse">
-        <thead>
-          <tr class="bg-surface">
-            <th class="px-6 py-4 text-sm font-semibold">Song Title</th>
-            <th class="px-6 py-4 text-sm font-semibold">Date Created</th>
-            <th class="px-6 py-4 text-sm font-semibold">Genre</th>
-            <th class="px-6 py-4 text-sm font-semibold text-center">Status</th>
-            <th class="px-6 py-4 text-sm font-semibold text-txt-muted text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="library-tbody" class="divide-y divide-border"></tbody>
+        <thead><tr class="bg-surface">
+          <th class="px-4 py-3 w-10"><input type="checkbox" class="rounded border-border" onchange="toggleSelectAll(this)"/></th>
+          <th class="px-4 py-3 text-xs font-semibold">Sample</th>
+          <th class="px-4 py-3 text-xs font-semibold">Type</th>
+          <th class="px-4 py-3 text-xs font-semibold">Key</th>
+          <th class="px-4 py-3 text-xs font-semibold">BPM</th>
+          <th class="px-4 py-3 text-xs font-semibold">Duration</th>
+          <th class="px-4 py-3 text-xs font-semibold text-right">Actions</th>
+        </tr></thead>
+        <tbody id="lib-tbody" class="divide-y divide-border"></tbody>
       </table>
+    </div>
+    <div id="lib-empty" class="hidden text-center py-16 border-2 border-dashed border-border rounded-2xl mt-4">
+      <span class="material-symbols-outlined text-4xl text-txt-dim mb-3 block">library_music</span>
+      <p class="text-txt-muted font-medium">Your library is empty</p>
+      <p class="text-txt-dim text-sm">Accept generated samples to add them here.</p>
+    </div>
+  </div>
+  <!-- Batch bar -->
+  <div id="lib-batch-bar" class="hidden batch-bar fixed left-64 right-0 z-40 flex items-center justify-between px-8 py-3 bg-panel border-t border-border" style="bottom: 64px;">
+    <span class="text-sm font-bold"><span id="batch-count">0</span> samples selected</span>
+    <div class="flex items-center gap-3">
+      <button class="flex items-center gap-2 bg-brand hover:bg-brand-hover text-txt px-4 py-2 rounded-lg text-sm font-bold transition-colors" onclick="downloadSelectedAsZip()">
+        <span class="material-symbols-outlined text-[18px]">download</span> Download ZIP
+      </button>
+      <button class="flex items-center gap-2 bg-surface border border-border text-txt px-4 py-2 rounded-lg text-sm font-bold hover:bg-dk-gray transition-colors" onclick="favoriteSelected()">
+        <span class="material-symbols-outlined text-[18px]">favorite</span> Favorite
+      </button>
+      <button class="flex items-center gap-2 text-red-400 px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-500/10 transition-colors" onclick="deleteSelected()">
+        <span class="material-symbols-outlined text-[18px]">delete</span> Delete
+      </button>
     </div>
   </div>
 </div>
 
-<!-- ========== PAGE: CREATE ========== -->
-<div id="page-create" class="page flex-1 overflow-hidden">
-  <aside class="w-[420px] bg-panel border-r border-border flex flex-col h-full overflow-y-auto">
-    <div class="p-6 space-y-8">
+<!-- ========== PAGE: FAVORITES ========== -->
+<div id="page-favorites" class="page flex-col flex-1 overflow-hidden">
+  <header class="flex flex-wrap items-center justify-between gap-4 px-8 pt-6 pb-4">
+    <div class="flex items-center gap-3">
+      <span class="material-symbols-outlined text-brand text-3xl fill-1">favorite</span>
       <div>
-        <h2 class="text-xl font-bold mb-4">Create New Track</h2>
-        <div class="flex h-11 items-center justify-center rounded-xl bg-bg p-1 border border-border mb-6">
-          <label class="flex cursor-pointer h-full grow items-center justify-center rounded-lg px-2 has-[:checked]:bg-surface has-[:checked]:text-txt text-txt-dim text-sm font-medium transition-all">
-            <span>Simple Mode</span>
-            <input checked name="create-mode" type="radio" value="simple" class="hidden"/>
-          </label>
-          <label class="flex cursor-pointer h-full grow items-center justify-center rounded-lg px-2 has-[:checked]:bg-surface has-[:checked]:text-txt text-txt-dim text-sm font-medium transition-all">
-            <span>Custom Mode</span>
-            <input name="create-mode" type="radio" value="custom" class="hidden"/>
-          </label>
-        </div>
-        <div class="space-y-6">
-          <div class="flex flex-col gap-2">
-            <label class="text-sm font-semibold text-txt-muted uppercase tracking-wider">Song Description</label>
-            <div class="relative">
-              <textarea id="create-prompt" class="w-full h-32 rounded-xl bg-bg border border-border focus:border-brand focus:ring-1 focus:ring-brand p-4 text-txt placeholder:text-txt-dim resize-none font-display text-sm leading-relaxed" placeholder="Describe the style, mood, and instruments (e.g., 'A lo-fi hip hop track with a melancholic piano melody and rainy atmosphere')..."></textarea>
-              <div class="absolute bottom-3 right-3 flex gap-2">
-                <button class="text-txt-dim hover:text-txt transition-colors" onclick="showToast('Voice input coming soon')"><span class="material-symbols-outlined text-lg">mic</span></button>
-                <button class="text-txt-dim hover:text-txt transition-colors" onclick="showToast('File upload coming soon')"><span class="material-symbols-outlined text-lg">upload_file</span></button>
-              </div>
-            </div>
-          </div>
-          <div class="flex flex-col gap-3">
-            <label class="text-sm font-semibold text-txt-muted uppercase tracking-wider">Style of Music</label>
-            <div id="create-genres" class="flex flex-wrap gap-2">
-              <span class="genre-chip selected px-3 py-1.5 rounded-lg border border-brand bg-brand/15 text-brand text-xs font-bold cursor-pointer transition-all" onclick="toggleCreateGenre(this)" data-genre="lo-fi">Lo-fi</span>
-              <span class="genre-chip px-3 py-1.5 rounded-lg bg-bg border border-border text-txt-muted text-xs font-medium hover:border-txt-dim cursor-pointer transition-colors" onclick="toggleCreateGenre(this)" data-genre="jazz">Jazz</span>
-              <span class="genre-chip px-3 py-1.5 rounded-lg bg-bg border border-border text-txt-muted text-xs font-medium hover:border-txt-dim cursor-pointer transition-colors" onclick="toggleCreateGenre(this)" data-genre="synthwave">Synthwave</span>
-              <span class="genre-chip px-3 py-1.5 rounded-lg bg-bg border border-border text-txt-muted text-xs font-medium hover:border-txt-dim cursor-pointer transition-colors" onclick="toggleCreateGenre(this)" data-genre="cinematic">Cinematic</span>
-              <span class="genre-chip px-3 py-1.5 rounded-lg bg-bg border border-border text-txt-muted text-xs font-medium hover:border-txt-dim cursor-pointer transition-colors" onclick="toggleCreateGenre(this)" data-genre="classical">Classical</span>
-              <button class="px-3 py-1.5 rounded-lg bg-bg border border-border text-brand text-xs font-bold flex items-center gap-1" onclick="showToast('Custom genre added!')">
-                <span class="material-symbols-outlined text-xs">add</span> Add Custom
-              </button>
-            </div>
-          </div>
-          <div class="flex flex-col gap-2">
-            <label class="text-sm font-semibold text-txt-muted uppercase tracking-wider">Model Version</label>
-            <select class="w-full rounded-xl bg-bg border border-border focus:border-brand focus:ring-1 focus:ring-brand p-3 text-txt text-sm appearance-none">
-              <option>Sonic v3.5 (Pro) - Highest Quality</option>
-              <option>Sonic v3.0 - Fast Generation</option>
-              <option>Sonic v2.0 - Legacy</option>
-            </select>
-          </div>
-        </div>
+        <h2 class="text-3xl font-black tracking-tight">Favorites</h2>
+        <p class="text-txt-muted text-sm"><span id="fav-count">0</span> favorited samples</p>
       </div>
     </div>
-    <div class="mt-auto p-6 bg-panel/80 backdrop-blur-md border-t border-border">
-      <button class="w-full bg-brand hover:bg-brand-hover text-txt font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-[0_0_24px_rgba(232,80,2,0.25)] group" onclick="generateTrack()">
-        <span class="material-symbols-outlined group-hover:rotate-12 transition-transform">bolt</span>
-        Generate 2 Tracks (10 Credits)
-      </button>
-      <p class="text-center text-xs text-txt-dim mt-3">Estimated generation time: 20-30 seconds</p>
+  </header>
+  <div class="px-8 pb-4 flex flex-wrap items-center gap-3">
+    <div class="relative flex-1 max-w-xs">
+      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-txt-dim text-[20px]">search</span>
+      <input id="fav-search" class="w-full bg-surface border border-border rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-brand/50 focus:border-brand text-txt placeholder-txt-dim" placeholder="Search favorites..." type="text" oninput="renderFavorites()"/>
     </div>
-  </aside>
-  <main class="flex-1 bg-bg overflow-y-auto pb-28">
-    <div class="max-w-4xl mx-auto p-8">
-      <div class="flex items-center justify-between mb-8">
-        <h3 class="text-xl font-bold">Recent Generations</h3>
-        <div class="flex gap-2">
-          <button class="p-2 text-txt-muted hover:text-txt transition-colors"><span class="material-symbols-outlined">filter_list</span></button>
-          <button class="p-2 text-txt-muted hover:text-txt transition-colors"><span class="material-symbols-outlined">grid_view</span></button>
-        </div>
-      </div>
-      <div id="generations-list" class="space-y-4">
-        <div class="bg-panel border border-brand/30 rounded-2xl p-5 flex items-center gap-6 shadow-xl shadow-brand/5 cursor-pointer" onclick="playTrack('Midnight Reflections', 'Sonic AI v3.5', 'from-[#C10801] to-[#F16001]', 165)">
-          <div class="relative group size-20 shrink-0">
-            <div class="absolute inset-0 brand-gradient rounded-xl opacity-90"></div>
-            <button class="absolute inset-0 flex items-center justify-center text-txt">
-              <span class="material-symbols-outlined text-4xl fill-1">pause_circle</span>
-            </button>
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center justify-between mb-1">
-              <h4 class="font-bold truncate">Midnight Reflections</h4>
-              <span class="text-xs text-txt-muted">2m 45s</span>
-            </div>
-            <p class="text-txt-muted text-xs mb-3 truncate italic">"A lo-fi hip hop track with melancholic piano..."</p>
-            <div class="flex items-end h-8 gap-[2px]">
-              <div class="waveform-bar h-1/2"></div><div class="waveform-bar h-3/4"></div><div class="waveform-bar h-full"></div><div class="waveform-bar h-2/3"></div><div class="waveform-bar h-1/2"></div><div class="waveform-bar h-4/5"></div><div class="waveform-bar h-full"></div><div class="waveform-bar h-1/3"></div><div class="waveform-bar h-1/2"></div><div class="waveform-bar h-3/4"></div><div class="waveform-bar h-2/3"></div><div class="waveform-bar muted h-1/4"></div><div class="waveform-bar muted h-1/2"></div><div class="waveform-bar muted h-3/4"></div><div class="waveform-bar muted h-1/2"></div><div class="waveform-bar muted h-1/3"></div>
-            </div>
-          </div>
-          <div class="flex gap-2">
-            <button class="p-2.5 rounded-lg bg-bg border border-border text-txt-muted hover:text-txt hover:border-brand transition-all" onclick="event.stopPropagation(); showToast('Extending track...')"><span class="material-symbols-outlined text-xl">fast_forward</span></button>
-            <button class="p-2.5 rounded-lg bg-bg border border-border text-txt-muted hover:text-txt hover:border-brand transition-all" onclick="event.stopPropagation(); showToast('Downloading...')"><span class="material-symbols-outlined text-xl">download</span></button>
-            <button class="p-2.5 rounded-lg bg-bg border border-border text-txt-muted hover:text-txt hover:border-brand transition-all" onclick="event.stopPropagation(); showToast('Share link copied!')"><span class="material-symbols-outlined text-xl">share</span></button>
-          </div>
-        </div>
-        <div class="bg-panel border border-border rounded-2xl p-5 flex items-center gap-6 hover:border-border-light transition-all opacity-70 hover:opacity-100 cursor-pointer" onclick="playTrack('Neon Pulse Drive', 'Sonic AI v3.5', 'from-amber-500 to-red-500', 90)">
-          <div class="relative group size-20 shrink-0">
-            <div class="absolute inset-0 bg-gradient-to-br from-amber-500 to-red-500 rounded-xl opacity-80"></div>
-            <button class="absolute inset-0 flex items-center justify-center text-txt opacity-0 group-hover:opacity-100 transition-opacity">
-              <span class="material-symbols-outlined text-4xl fill-1">play_circle</span>
-            </button>
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center justify-between mb-1">
-              <h4 class="font-bold truncate">Neon Pulse Drive</h4>
-              <span class="text-xs text-txt-muted">1m 30s</span>
-            </div>
-            <p class="text-txt-muted text-xs mb-3 truncate italic">"Fast-paced synthwave with driving bassline..."</p>
-            <div class="flex items-end h-8 gap-[2px]">
-              <div class="waveform-bar muted h-1/4"></div><div class="waveform-bar muted h-1/2"></div><div class="waveform-bar muted h-3/4"></div><div class="waveform-bar muted h-1/2"></div><div class="waveform-bar muted h-1/3"></div><div class="waveform-bar muted h-1/2"></div><div class="waveform-bar muted h-2/3"></div><div class="waveform-bar muted h-1/4"></div><div class="waveform-bar muted h-1/2"></div><div class="waveform-bar muted h-3/4"></div>
-            </div>
-          </div>
-          <div class="flex gap-2">
-            <button class="p-2.5 rounded-lg bg-bg border border-border text-txt-muted hover:text-txt transition-all" onclick="event.stopPropagation(); showToast('Downloading...')"><span class="material-symbols-outlined text-xl">download</span></button>
-            <button class="p-2.5 rounded-lg bg-bg border border-border text-txt-muted hover:text-txt transition-all" onclick="event.stopPropagation(); showToast('More options')"><span class="material-symbols-outlined text-xl">more_vert</span></button>
-          </div>
-        </div>
-      </div>
-      <div class="mt-12 text-center py-20 border-2 border-dashed border-border rounded-3xl">
-        <span class="material-symbols-outlined text-5xl text-txt-dim mb-4 block">library_music</span>
-        <h5 class="text-txt-muted font-medium">Your creative journey starts here.</h5>
-        <p class="text-txt-dim text-sm">Generate your first track to see it in your history.</p>
-      </div>
+    <select id="fav-sort" class="bg-surface border border-border rounded-lg px-3 py-2 text-sm text-txt" onchange="renderFavorites()">
+      <option value="fav-recent">Recently Favorited</option>
+      <option value="recent">Newest Created</option>
+      <option value="name">Name A-Z</option>
+      <option value="bpm">BPM</option>
+    </select>
+  </div>
+  <div class="flex-1 overflow-auto px-8 pb-28">
+    <div id="fav-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"></div>
+    <div id="fav-empty" class="hidden text-center py-16 border-2 border-dashed border-border rounded-2xl">
+      <span class="material-symbols-outlined text-4xl text-txt-dim mb-3 block fill-1">favorite</span>
+      <p class="text-txt-muted font-medium">No favorites yet</p>
+      <p class="text-txt-dim text-sm">Click the heart icon on any sample to add it here.</p>
     </div>
-  </main>
+  </div>
+</div>
+
+<!-- ========== PAGE: HISTORY ========== -->
+<div id="page-history" class="page flex-col flex-1 overflow-hidden">
+  <header class="px-8 pt-6 pb-4">
+    <h2 class="text-3xl font-black tracking-tight">Generation History</h2>
+    <p class="text-txt-muted text-sm">Review your previous generation sessions.</p>
+  </header>
+  <div class="px-8 pb-4 flex items-center gap-3">
+    <div class="relative flex-1 max-w-xs">
+      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-txt-dim text-[20px]">search</span>
+      <input id="hist-search" class="w-full bg-surface border border-border rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-brand/50 focus:border-brand text-txt placeholder-txt-dim" placeholder="Search history..." type="text" oninput="renderHistory()"/>
+    </div>
+    <select id="hist-type-filter" class="bg-surface border border-border rounded-lg px-3 py-2 text-sm text-txt" onchange="renderHistory()">
+      <option value="all">All Types</option>
+      <option value="loop">Loops</option>
+      <option value="oneshot">One-Shots</option>
+    </select>
+  </div>
+  <div class="flex-1 overflow-auto px-8 pb-28">
+    <div id="hist-timeline" class="space-y-4"></div>
+    <div id="hist-empty" class="hidden text-center py-16 border-2 border-dashed border-border rounded-2xl">
+      <span class="material-symbols-outlined text-4xl text-txt-dim mb-3 block">history</span>
+      <p class="text-txt-muted font-medium">No generation history yet</p>
+      <p class="text-txt-dim text-sm">Your generation sessions will appear here.</p>
+    </div>
+  </div>
 </div>
 
 </div>
 
 <!-- ==================== PLAYER BAR ==================== -->
 <footer id="player-bar" class="fixed bottom-0 left-0 right-0 z-50 glass-effect border-t border-border px-6 py-3" style="display:none;">
-  <div class="flex items-center justify-between gap-8">
-    <div class="flex items-center gap-4 w-1/4 min-w-0">
-      <div id="player-art" class="w-14 h-14 rounded-lg bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 shadow-lg flex-shrink-0"></div>
+  <div class="flex items-center gap-6">
+    <div class="flex items-center gap-3 w-48 flex-shrink-0">
+      <div class="w-10 h-10 rounded-lg bg-surface overflow-hidden flex-shrink-0">
+        <canvas id="player-mini-waveform" width="40" height="40"></canvas>
+      </div>
       <div class="min-w-0">
-        <p id="player-title" class="font-bold text-sm truncate">Midnight Drift</p>
-        <p id="player-artist" class="text-xs text-txt-muted truncate">EchoPulse AI</p>
+        <p id="player-title" class="font-bold text-xs truncate">Sample</p>
+        <p id="player-meta" class="text-[10px] text-txt-muted truncate">120 BPM / Cm</p>
       </div>
-      <button id="player-fav" class="ml-2 text-txt-muted hover:text-brand transition-colors" onclick="toggleFavorite(this)">
-        <span class="material-symbols-outlined">favorite</span>
+    </div>
+    <div class="flex-1 flex items-center gap-3">
+      <button id="btn-play" class="w-10 h-10 rounded-full bg-brand text-txt flex items-center justify-center hover:bg-brand-hover transition-all flex-shrink-0" onclick="togglePlayPause()">
+        <span class="material-symbols-outlined text-[24px] fill-1">play_arrow</span>
       </button>
-    </div>
-    <div class="flex-1 max-w-2xl flex flex-col items-center gap-2">
-      <div class="flex items-center gap-6">
-        <button id="btn-shuffle" class="text-txt-muted hover:text-txt transition-colors" onclick="toggleShuffle()"><span class="material-symbols-outlined">shuffle</span></button>
-        <button class="text-txt-muted hover:text-txt transition-colors" onclick="prevTrack()"><span class="material-symbols-outlined">skip_previous</span></button>
-        <button id="btn-play" class="w-12 h-12 rounded-full bg-brand text-txt flex items-center justify-center hover:scale-105 hover:bg-brand-hover transition-all shadow-lg shadow-brand/30" onclick="togglePlayPause()">
-          <span class="material-symbols-outlined text-[32px] fill-1">pause</span>
-        </button>
-        <button class="text-txt-muted hover:text-txt transition-colors" onclick="nextTrack()"><span class="material-symbols-outlined">skip_next</span></button>
-        <button id="btn-repeat" class="text-txt-muted hover:text-txt transition-colors" onclick="toggleRepeat()"><span class="material-symbols-outlined">repeat</span></button>
+      <button id="btn-loop" class="text-txt-muted hover:text-txt transition-colors flex-shrink-0" onclick="toggleLoopPlayback()">
+        <span class="material-symbols-outlined text-[20px]">loop</span>
+      </button>
+      <span id="player-current-time" class="text-[10px] font-mono text-txt-dim w-8 text-right flex-shrink-0">0:00</span>
+      <div class="flex-1 h-10 relative cursor-pointer" onclick="seekSample(event)">
+        <canvas id="player-waveform" class="w-full h-full"></canvas>
       </div>
-      <div class="w-full flex items-center gap-3">
-        <span id="player-current-time" class="text-[10px] font-mono text-txt-dim w-8 text-right">0:00</span>
-        <div class="flex-1 h-1.5 bg-dk-gray rounded-full overflow-hidden progress-track relative cursor-pointer" onclick="seekTo(event)">
-          <div id="player-progress" class="h-full bg-brand relative" style="width:0%">
-            <div class="progress-handle"></div>
-          </div>
-        </div>
-        <span id="player-total-time" class="text-[10px] font-mono text-txt-dim w-8">0:00</span>
-      </div>
+      <span id="player-total-time" class="text-[10px] font-mono text-txt-dim w-8 flex-shrink-0">0:00</span>
     </div>
-    <div class="flex items-center justify-end gap-4 w-1/4">
-      <button class="text-txt-muted hover:text-txt" onclick="showToast('Lyrics coming soon')"><span class="material-symbols-outlined text-[20px]">lyrics</span></button>
-      <button class="text-txt-muted hover:text-txt" onclick="showToast('Queue coming soon')"><span class="material-symbols-outlined text-[20px]">queue_music</span></button>
+    <div class="flex items-center gap-3 flex-shrink-0">
+      <button id="player-fav-btn" class="text-txt-muted hover:text-brand transition-colors" onclick="togglePlayerFav()">
+        <span class="material-symbols-outlined text-[20px]">favorite</span>
+      </button>
+      <button class="text-txt-muted hover:text-txt transition-colors" onclick="downloadSample(state.currentSample)">
+        <span class="material-symbols-outlined text-[20px]">download</span>
+      </button>
       <div class="flex items-center gap-2">
         <button onclick="toggleMute()" class="text-txt-muted hover:text-txt"><span id="volume-icon" class="material-symbols-outlined text-[20px]">volume_up</span></button>
-        <input id="volume-slider" type="range" min="0" max="100" value="66" class="w-20" oninput="setVolume(this.value)"/>
+        <input id="volume-slider" type="range" min="0" max="100" value="66" class="w-16 effect-slider" oninput="setVolume(this.value)"/>
       </div>
-      <button class="text-txt-muted hover:text-txt" onclick="showToast('Fullscreen player coming soon')"><span class="material-symbols-outlined text-[20px]">open_in_full</span></button>
     </div>
   </div>
 </footer>
@@ -557,166 +763,1509 @@ input[type="range"]::-webkit-slider-thumb {
 
 <div id="toast" class="toast"></div>
 
-<div id="share-modal" class="modal-overlay" onclick="if(event.target===this)closeModal()">
-  <div class="bg-panel border border-border rounded-2xl p-8 w-full max-w-md animate-fadeIn">
-    <h3 class="text-xl font-bold mb-4">Share Track</h3>
-    <div class="flex gap-2 mb-6">
-      <input id="share-link" class="flex-1 bg-bg border border-border rounded-lg px-4 py-2 text-sm text-txt" value="https://studioai.app/track/midnight-drift" readonly/>
-      <button class="bg-brand text-txt px-4 py-2 rounded-lg text-sm font-bold" onclick="copyShareLink()">Copy</button>
+<!-- Reject feedback modal -->
+<div id="reject-modal" class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="bg-panel border border-border rounded-2xl p-6 w-full max-w-sm animate-fadeIn">
+    <h3 class="text-lg font-bold mb-3">Why reject this sample?</h3>
+    <div class="space-y-2 mb-4">
+      <button class="w-full text-left px-4 py-2.5 bg-surface border border-border rounded-lg text-sm hover:bg-dk-gray transition-colors" onclick="submitReject('too_muddy')">Too muddy</button>
+      <button class="w-full text-left px-4 py-2.5 bg-surface border border-border rounded-lg text-sm hover:bg-dk-gray transition-colors" onclick="submitReject('wrong_feel')">Wrong feel</button>
+      <button class="w-full text-left px-4 py-2.5 bg-surface border border-border rounded-lg text-sm hover:bg-dk-gray transition-colors" onclick="submitReject('too_busy')">Too busy</button>
+      <button class="w-full text-left px-4 py-2.5 bg-surface border border-border rounded-lg text-sm hover:bg-dk-gray transition-colors" onclick="submitReject('low_quality')">Low quality</button>
     </div>
-    <button class="text-txt-muted text-sm hover:text-txt" onclick="closeModal()">Close</button>
+    <button class="text-txt-dim text-sm hover:text-txt" onclick="submitReject('skip')">Skip feedback</button>
+  </div>
+</div>
+
+<!-- Confirm modal -->
+<div id="confirm-modal" class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="bg-panel border border-border rounded-2xl p-6 w-full max-w-sm animate-fadeIn">
+    <h3 id="confirm-title" class="text-lg font-bold mb-2"></h3>
+    <p id="confirm-msg" class="text-sm text-txt-muted mb-5"></p>
+    <div class="flex gap-3">
+      <button class="flex-1 py-2 bg-surface border border-border rounded-lg text-sm font-bold hover:bg-dk-gray transition-colors" onclick="closeModal()">Cancel</button>
+      <button id="confirm-action" class="flex-1 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-bold text-txt transition-colors">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import from Project modal -->
+<div id="import-modal" class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="bg-panel border border-border rounded-2xl w-full max-w-lg animate-fadeIn flex flex-col max-h-[80vh]">
+    <div class="p-6 pb-4 border-b border-border">
+      <h3 class="text-lg font-bold mb-3">Import from Project</h3>
+      <select id="import-project-select" class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-sm text-txt" onchange="renderImportList()">
+        <option value="">Select a project...</option>
+      </select>
+    </div>
+    <div class="flex-1 overflow-y-auto p-4" id="import-sample-list">
+      <p class="text-sm text-txt-dim text-center py-8">Select a project to see its samples</p>
+    </div>
+    <div class="p-4 border-t border-border flex items-center justify-between">
+      <span class="text-sm text-txt-muted"><span id="import-selected-count">0</span> selected</span>
+      <div class="flex gap-3">
+        <button class="px-4 py-2 bg-surface border border-border rounded-lg text-sm font-bold hover:bg-dk-gray transition-colors" onclick="closeModal()">Cancel</button>
+        <button id="import-btn" class="px-4 py-2 bg-brand hover:bg-brand-hover rounded-lg text-sm font-bold text-txt transition-colors" onclick="importSelectedSamples()">Import Selected</button>
+      </div>
+    </div>
   </div>
 </div>
 
 <script>
+// ==================== STATE ====================
 const state = {
-  currentPage: 'home', isPlaying: false, currentTrack: null,
-  currentTime: 0, totalTime: 0, volume: 66, isMuted: false,
-  shuffle: false, repeat: false, progressInterval: null,
-  libraryFilter: 'all', librarySortOrder: 'recent',
+  currentPage: 'dashboard',
+  generateMode: 'loop',
+  isPlaying: false,
+  currentSample: null,
+  inspectedSample: null,
+  currentTime: 0,
+  totalTime: 0,
+  volume: 66,
+  isMuted: false,
+  loopPlayback: false,
+  progressInterval: null,
+  generating: false,
+  selectedSamples: new Set(),
+  libraryView: 'grid',
+  libraryType: 'all',
+  wsView: 'stack',
+  rejectingSampleId: null,
+  confirmCallback: null,
+  selectedBars: 4,
 };
 
-const libraryTracks = [
-  { name: 'Neon Dreams', artist: 'Ambient AI v2.4', date: '2 hours ago', dateVal: 4, genre: 'Synthwave', status: 'public', gradient: 'from-indigo-500 to-purple-600', duration: 225 },
-  { name: 'Cyber Echoes', artist: 'Melodic Engine', date: '5 hours ago', dateVal: 3, genre: 'Ambient', status: 'private', gradient: 'from-cyan-500 to-blue-600', duration: 198 },
-  { name: 'Starlight Groove', artist: 'Retro Rhythm AI', date: 'Yesterday', dateVal: 2, genre: 'Lo-fi', status: 'public', gradient: 'from-orange-400 to-rose-500', duration: 245 },
-  { name: 'Digital Rain', artist: 'Techno Pulse', date: '2 days ago', dateVal: 1, genre: 'Techno', status: 'private', gradient: 'from-emerald-500 to-teal-700', duration: 312 },
-];
+let samples = {};
+let sessions = {};
+let decisions = [];
+let currentVariations = [];
+let varIdCounter = 0;
+let projects = {};
+let currentProjectId = null;
 
+// ==================== PERSISTENCE ====================
+function saveData() {
+  try {
+    localStorage.setItem('fiire_samples', JSON.stringify(samples));
+    localStorage.setItem('fiire_sessions', JSON.stringify(sessions));
+    localStorage.setItem('fiire_decisions', JSON.stringify(decisions));
+    localStorage.setItem('fiire_counters', JSON.stringify({ varIdCounter }));
+    localStorage.setItem('fiire_projects', JSON.stringify(projects));
+    localStorage.setItem('fiire_current_project', currentProjectId);
+  } catch(e) {}
+}
+function loadData() {
+  try {
+    const s = localStorage.getItem('fiire_samples'); if (s) samples = JSON.parse(s);
+    const ss = localStorage.getItem('fiire_sessions'); if (ss) sessions = JSON.parse(ss);
+    const d = localStorage.getItem('fiire_decisions'); if (d) decisions = JSON.parse(d);
+    const c = localStorage.getItem('fiire_counters'); if (c) { const p = JSON.parse(c); varIdCounter = p.varIdCounter || 0; }
+    const pr = localStorage.getItem('fiire_projects'); if (pr) projects = JSON.parse(pr);
+    const cp = localStorage.getItem('fiire_current_project'); if (cp) currentProjectId = cp;
+  } catch(e) {}
+}
+
+function migrateToProjects() {
+  if (Object.keys(projects).length > 0) return; // already migrated
+  const id = 'proj_default';
+  projects[id] = { id, name: 'My Project', createdAt: Date.now(), updatedAt: Date.now() };
+  currentProjectId = id;
+  // Stamp all existing samples and sessions
+  Object.values(samples).forEach(s => { if (!s.projectId) s.projectId = id; });
+  Object.values(sessions).forEach(s => { if (!s.projectId) s.projectId = id; });
+  saveData();
+}
+
+function getProjectSampleCount(projectId) {
+  return Object.values(samples).filter(s => s.projectId === projectId).length;
+}
+
+// ==================== UTILITIES ====================
+function uid(prefix) { return prefix + '_' + (++varIdCounter) + '_' + Date.now().toString(36); }
+function formatTime(s) { const m = Math.floor(s/60); const sec = Math.floor(s%60); return m+':'+(sec<10?'0':'')+sec; }
+function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2000); }
+function closeModal() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open')); state.rejectingSampleId = null; }
+
+// ==================== PROJECTS ====================
+let projectDropdownOpen = false;
+
+function toggleProjectDropdown() {
+  projectDropdownOpen = !projectDropdownOpen;
+  const dd = document.getElementById('project-dropdown');
+  const chevron = document.getElementById('project-chevron');
+  dd.classList.toggle('hidden', !projectDropdownOpen);
+  chevron.textContent = projectDropdownOpen ? 'expand_less' : 'expand_more';
+  if (projectDropdownOpen) renderProjectList();
+}
+
+function closeProjectDropdown() {
+  projectDropdownOpen = false;
+  document.getElementById('project-dropdown').classList.add('hidden');
+  document.getElementById('project-chevron').textContent = 'expand_more';
+  cancelNewProject();
+}
+
+function renderProjectSwitcher() {
+  const proj = projects[currentProjectId];
+  if (!proj) return;
+  document.getElementById('project-name').textContent = proj.name;
+  const count = getProjectSampleCount(currentProjectId);
+  document.getElementById('project-count').textContent = count + ' sample' + (count !== 1 ? 's' : '');
+}
+
+function renderProjectList() {
+  const list = document.getElementById('project-list');
+  const sorted = Object.values(projects).sort((a, b) => b.updatedAt - a.updatedAt);
+  list.innerHTML = sorted.map(p => {
+    const count = getProjectSampleCount(p.id);
+    const isActive = p.id === currentProjectId;
+    return `
+      <div class="flex items-center gap-2 px-3 py-2 hover:bg-surface transition-colors cursor-pointer group ${isActive ? 'bg-surface' : ''}" onclick="switchProject('${p.id}')">
+        <div class="w-6 h-6 rounded-md ${isActive ? 'bg-brand/20' : 'bg-bg'} flex items-center justify-center flex-shrink-0">
+          ${isActive ? '<span class="material-symbols-outlined text-brand text-[14px]">check</span>' : '<span class="material-symbols-outlined text-txt-dim text-[14px]">folder</span>'}
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium truncate ${isActive ? 'text-brand' : ''}">${p.name}</p>
+          <p class="text-[10px] text-txt-dim">${count} sample${count !== 1 ? 's' : ''}</p>
+        </div>
+        <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button class="p-1 rounded hover:bg-dk-gray text-txt-dim hover:text-txt" onclick="event.stopPropagation(); renameProjectPrompt('${p.id}')">
+            <span class="material-symbols-outlined text-[14px]">edit</span>
+          </button>
+          ${Object.keys(projects).length > 1 ? `<button class="p-1 rounded hover:bg-dk-gray text-txt-dim hover:text-red-400" onclick="event.stopPropagation(); deleteProjectConfirm('${p.id}')">
+            <span class="material-symbols-outlined text-[14px]">delete</span>
+          </button>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function switchProject(id) {
+  if (id === currentProjectId) { closeProjectDropdown(); return; }
+  currentProjectId = id;
+  projects[id].updatedAt = Date.now();
+  currentVariations = [];
+  state.currentSample = null;
+  state.inspectedSample = null;
+  document.getElementById('player-bar').style.display = 'none';
+  closeProjectDropdown();
+  saveData();
+  renderProjectSwitcher();
+  navigateTo(state.currentPage);
+  showToast('Switched to ' + projects[id].name);
+}
+
+function createProject(name) {
+  const id = uid('proj');
+  projects[id] = { id, name: name || 'Untitled Project', createdAt: Date.now(), updatedAt: Date.now() };
+  saveData();
+  switchProject(id);
+}
+
+function showNewProjectInput() {
+  document.getElementById('new-project-row').classList.add('hidden');
+  document.getElementById('new-project-input-row').classList.remove('hidden');
+  const input = document.getElementById('new-project-input');
+  input.value = '';
+  input.focus();
+}
+
+function confirmNewProject() {
+  const input = document.getElementById('new-project-input');
+  const name = input.value.trim();
+  if (!name) return;
+  createProject(name);
+  cancelNewProject();
+}
+
+function cancelNewProject() {
+  document.getElementById('new-project-row').classList.remove('hidden');
+  document.getElementById('new-project-input-row').classList.add('hidden');
+}
+
+function renameProjectPrompt(id) {
+  const p = projects[id];
+  if (!p) return;
+  const name = prompt('Rename project:', p.name);
+  if (name && name.trim()) {
+    p.name = name.trim();
+    p.updatedAt = Date.now();
+    saveData();
+    renderProjectSwitcher();
+    renderProjectList();
+    showToast('Project renamed');
+  }
+}
+
+function deleteProjectConfirm(id) {
+  const p = projects[id];
+  if (!p || Object.keys(projects).length <= 1) return;
+  document.getElementById('confirm-title').textContent = 'Delete Project';
+  document.getElementById('confirm-msg').textContent = `Delete "${p.name}" and all its samples? This can't be undone.`;
+  document.getElementById('confirm-action').onclick = () => {
+    // Delete all samples and sessions for this project
+    Object.keys(samples).forEach(sid => { if (samples[sid].projectId === id) delete samples[sid]; });
+    Object.keys(sessions).forEach(sid => { if (sessions[sid].projectId === id) delete sessions[sid]; });
+    decisions = decisions.filter(d => samples[d.sampleId]); // clean up orphaned decisions
+    delete projects[id];
+    if (currentProjectId === id) {
+      currentProjectId = Object.keys(projects)[0];
+    }
+    saveData();
+    closeModal();
+    closeProjectDropdown();
+    renderProjectSwitcher();
+    navigateTo(state.currentPage);
+    showToast('Project deleted');
+  };
+  document.getElementById('confirm-modal').classList.add('open');
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', e => {
+  if (projectDropdownOpen && !e.target.closest('#project-switcher') && !e.target.closest('#project-dropdown')) {
+    closeProjectDropdown();
+  }
+});
+
+// ==================== NAVIGATION ====================
 function navigateTo(page) {
   state.currentPage = page;
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const target = document.getElementById('page-' + page);
-  if (target) { target.classList.add('active','animate-fadeIn'); setTimeout(() => target.classList.remove('animate-fadeIn'), 300); }
+  if (target) { target.classList.add('active', 'animate-fadeIn'); setTimeout(() => target.classList.remove('animate-fadeIn'), 300); }
   document.querySelectorAll('.nav-link').forEach(link => {
     link.classList.remove('active'); link.classList.add('text-txt-muted');
     if (link.dataset.page === page) { link.classList.add('active'); link.classList.remove('text-txt-muted'); }
   });
+  if (page === 'generate') renderVariations();
   if (page === 'library') renderLibrary();
+  if (page === 'favorites') renderFavorites();
+  if (page === 'history') renderHistory();
+  if (page === 'dashboard') renderDashboard();
+  renderProjectSwitcher();
 }
 
-function formatTime(s) { const m = Math.floor(s/60); const sec = Math.floor(s%60); return m+':'+(sec<10?'0':'')+sec; }
+// ==================== WAVEFORM RENDERING ====================
+function generateWaveformData(length) {
+  const data = [];
+  for (let i = 0; i < length; i++) {
+    data.push(0.1 + Math.random() * 0.9);
+  }
+  return data;
+}
 
-function playTrack(name, artist, gradient, duration) {
-  state.currentTrack = { name, artist, gradient, duration };
-  state.currentTime = 0; state.totalTime = duration; state.isPlaying = true;
+function drawWaveform(canvas, data, color, progress) {
+  if (!canvas || !data) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width = canvas.offsetWidth * 2;
+  const h = canvas.height = canvas.offsetHeight * 2;
+  ctx.clearRect(0, 0, w, h);
+  const barW = Math.max(2, w / data.length - 1);
+  const gap = 1;
+  const mid = h / 2;
+  for (let i = 0; i < data.length; i++) {
+    const x = i * (barW + gap);
+    const barH = data[i] * mid * 0.85;
+    const pct = x / w;
+    if (progress !== undefined && pct <= progress) {
+      ctx.fillStyle = color || '#E85002';
+    } else {
+      ctx.fillStyle = progress !== undefined ? '#333' : (color || '#E85002');
+    }
+    ctx.fillRect(x, mid - barH, barW, barH * 2);
+  }
+}
+
+function drawMiniWaveform(canvas, data, color) {
+  if (!canvas || !data) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width; const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  const barW = 2; const gap = 1;
+  const mid = h / 2;
+  const count = Math.floor(w / (barW + gap));
+  const step = Math.max(1, Math.floor(data.length / count));
+  ctx.fillStyle = color || '#E85002';
+  for (let i = 0; i < count; i++) {
+    const val = data[Math.min(i * step, data.length - 1)] || 0.5;
+    const barH = val * mid * 0.8;
+    ctx.fillRect(i * (barW + gap), mid - barH, barW, barH * 2);
+  }
+}
+
+// ==================== GENERATE MODE ====================
+let wsStatusFilter = 'all';
+
+function setGenerateMode(mode) {
+  state.generateMode = mode;
+  const loopEl = document.getElementById('loop-params');
+  const osEl = document.getElementById('oneshot-params');
+  if (mode === 'loop') {
+    loopEl.style.display = 'flex';
+    osEl.style.display = 'none';
+  } else {
+    loopEl.style.display = 'none';
+    osEl.style.display = 'flex';
+  }
+  document.querySelectorAll('input[name="gen-mode"]').forEach(r => { r.checked = r.value === mode; });
+  updateGenBtnText();
+}
+
+function updateGenBtnText() {
+  const count = document.getElementById('var-slider').value;
+  document.getElementById('gen-btn-text').textContent = `Generate (${count})`;
+}
+
+function setWsFilter(status, btn) {
+  wsStatusFilter = status;
+  btn.closest('.flex').querySelectorAll('.param-chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  renderVariations();
+}
+
+function setWsView(view) {
+  state.wsView = view;
+  const gridBtn = document.getElementById('ws-grid-btn');
+  const stackBtn = document.getElementById('ws-stack-btn');
+  gridBtn.classList.toggle('bg-bg', view === 'grid');
+  gridBtn.classList.toggle('text-brand', view === 'grid');
+  gridBtn.classList.toggle('text-txt-muted', view !== 'grid');
+  stackBtn.classList.toggle('bg-bg', view === 'stack');
+  stackBtn.classList.toggle('text-brand', view === 'stack');
+  stackBtn.classList.toggle('text-txt-muted', view !== 'stack');
+  renderVariations();
+}
+
+function setLength(bars, el) {
+  state.selectedBars = bars;
+  document.querySelectorAll('#length-chips .param-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function toggleChip(el, containerId) {
+  document.querySelectorAll('#' + containerId + ' .param-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function toggleMultiChip(el) {
+  el.classList.toggle('active');
+}
+
+// ==================== SAMPLE GENERATION ====================
+function getGenParams() {
+  const mode = state.generateMode;
+  const styles = [...document.querySelectorAll('#style-chips .param-chip.active')].map(c => c.textContent.trim());
+  const prompt = document.getElementById('gen-prompt').value;
+  const model = document.getElementById('model-select').value;
+  const varCount = parseInt(document.getElementById('var-slider').value);
+
+  if (mode === 'loop') {
+    return {
+      type: 'loop', bpm: parseInt(document.getElementById('bpm-input').value),
+      key: document.getElementById('key-select').value,
+      bars: state.selectedBars,
+      styles, prompt, model, varCount
+    };
+  } else {
+    const attack = document.querySelector('#attack-chips .param-chip.active')?.textContent.trim() || 'Snappy';
+    const timbre = document.querySelector('#timbre-chips .param-chip.active')?.textContent.trim() || 'Warm';
+    return {
+      type: 'oneshot', tuning: document.getElementById('tuning-select').value,
+      attack, timbre, styles, prompt, model, varCount
+    };
+  }
+}
+
+function generateSamples() {
+  if (state.generating) return;
+  state.generating = true;
+  const params = getGenParams();
+
+  document.getElementById('gen-loading').classList.remove('hidden');
+  document.getElementById('gen-empty').classList.add('hidden');
+  document.getElementById('gen-footer').classList.add('hidden');
+  document.getElementById('var-grid').innerHTML = '';
+
+  setTimeout(() => {
+    const sessionId = uid('ses');
+    const variationIds = [];
+
+    for (let i = 0; i < params.varCount; i++) {
+      const id = uid('smp');
+      const duration = params.type === 'loop'
+        ? (params.bars * 60 / params.bpm * (params.bpm < 100 ? 2 : 1))
+        : (0.3 + Math.random() * 1.5);
+
+      samples[id] = {
+        id, type: params.type,
+        name: params.type === 'loop' ? `Loop ${Object.keys(samples).length + 1}` : `One-Shot ${Object.keys(samples).length + 1}`,
+        status: 'pending',
+        duration: Math.round(duration * 100) / 100,
+        bpm: params.bpm || null,
+        key: params.key || null,
+        bars: params.bars || null,
+        tuning: params.tuning || null,
+        attack: params.attack || null,
+        timbre: params.timbre || null,
+        style: params.styles || [],
+        tags: params.styles ? [...params.styles] : [],
+        notes: '',
+        effects: { distortion: 0, reverb: 0, delay: 0, filterLP: 100, bitcrush: 0, saturation: 0 },
+        generationSessionId: sessionId,
+        variationIndex: i,
+        parentSampleId: null,
+        modelVersion: params.model,
+        createdAt: Date.now() - (params.varCount - i) * 100,
+        acceptedAt: null,
+        favoritedAt: null,
+        isFavorite: false,
+        isInLibrary: false,
+        rejectionFeedback: null,
+        waveformData: generateWaveformData(80 + Math.floor(Math.random() * 40)),
+        projectId: currentProjectId,
+      };
+      variationIds.push(id);
+    }
+
+    sessions[sessionId] = {
+      id: sessionId, type: params.type, params,
+      variationIds, acceptedCount: 0, rejectedCount: 0,
+      createdAt: Date.now(),
+      projectId: currentProjectId,
+    };
+
+    currentVariations = variationIds;
+    state.generating = false;
+    saveData();
+    renderVariations();
+    document.getElementById('gen-loading').classList.add('hidden');
+    document.getElementById('gen-footer').classList.remove('hidden');
+    document.getElementById('gen-var-count').textContent = variationIds.length + ' variations';
+    showToast(`Generated ${variationIds.length} variations!`);
+  }, 2500);
+}
+
+function renderVariations() {
+  const container = document.getElementById('var-grid');
+  const emptyEl = document.getElementById('gen-empty');
+  const footerEl = document.getElementById('gen-footer');
+  const search = (document.getElementById('ws-search')?.value || '').toLowerCase();
+  const sort = document.getElementById('ws-sort')?.value || 'newest';
+
+  // Show samples for current project
+  let list = Object.values(samples).filter(s => s.projectId === currentProjectId);
+
+  // Filter by status
+  if (wsStatusFilter !== 'all') list = list.filter(s => s.status === wsStatusFilter);
+
+  // Search
+  if (search) list = list.filter(s => s.name.toLowerCase().includes(search) || (s.key || '').toLowerCase().includes(search) || s.tags.some(t => t.toLowerCase().includes(search)) || (s.style || []).some(t => t.toLowerCase().includes(search)));
+
+  // Sort
+  if (sort === 'newest') list.sort((a, b) => b.createdAt - a.createdAt);
+  else if (sort === 'oldest') list.sort((a, b) => a.createdAt - b.createdAt);
+  else if (sort === 'name') list.sort((a, b) => a.name.localeCompare(b.name));
+
+  if (!list.length) {
+    container.innerHTML = '';
+    emptyEl.classList.remove('hidden');
+    footerEl.classList.add('hidden');
+    return;
+  }
+  emptyEl.classList.add('hidden');
+  footerEl.classList.remove('hidden');
+  document.getElementById('gen-var-count').textContent = list.length + ' sample' + (list.length !== 1 ? 's' : '');
+
+  if (state.wsView === 'stack') {
+    container.className = 'space-y-1.5';
+    container.innerHTML = list.map(s => renderStackRow(s)).join('');
+  } else {
+    container.className = 'grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3';
+    container.innerHTML = list.map(s => renderGridCard(s)).join('');
+  }
+
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.var-waveform').forEach(canvas => {
+      const id = canvas.dataset.id;
+      const s = samples[id];
+      if (s) drawWaveform(canvas, s.waveformData, s.status === 'rejected' ? '#444' : '#E85002');
+    });
+  });
+}
+
+function renderGridCard(s) {
+  const id = s.id;
+  const statusClass = s.status === 'accepted' ? 'accepted' : s.status === 'rejected' ? 'rejected' : '';
+  const playingClass = state.currentSample === id ? 'playing' : '';
+  const meta = s.type === 'loop' ? `${s.bpm} BPM / ${s.key} / ${s.bars} bars` : `${s.tuning} / ${s.attack} / ${s.timbre}`;
+  const typeBadge = s.type === 'loop' ? 'badge-loop' : 'badge-oneshot';
+  return `
+    <div class="variation-card ${statusClass} ${playingClass} relative bg-surface rounded-xl border border-border overflow-hidden"
+         data-id="${id}" draggable="true" ondragstart="handleDragStart(event,'${id}')">
+      <div class="relative h-24 bg-bg p-2 cursor-pointer" onclick="previewSample('${id}')">
+        <canvas class="var-waveform w-full h-full" data-id="${id}"></canvas>
+        <div class="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+          <div class="w-9 h-9 bg-brand/90 rounded-full flex items-center justify-center">
+            <span class="material-symbols-outlined text-[22px] fill-1 text-txt">${state.currentSample === id && state.isPlaying ? 'pause' : 'play_arrow'}</span>
+          </div>
+        </div>
+        <span class="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 bg-black/75 text-[9px] font-mono text-txt rounded">${formatTime(s.duration)}</span>
+        <span class="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${typeBadge}">${s.type}</span>
+        ${s.status === 'accepted' ? '<span class="absolute top-1.5 right-1.5 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center"><span class="material-symbols-outlined text-[12px] text-txt">check</span></span>' : ''}
+      </div>
+      <div class="p-2.5">
+        <p class="text-[11px] font-bold truncate mb-0.5">${s.name}</p>
+        <p class="text-[10px] text-txt-dim truncate mb-2">${meta}</p>
+        ${s.status === 'pending' ? `
+        <div class="flex items-center gap-1">
+          <button class="flex-1 flex items-center justify-center gap-0.5 py-1 bg-emerald-500/15 text-emerald-400 rounded-md text-[10px] font-bold hover:bg-emerald-500/25 transition-colors" onclick="event.stopPropagation(); acceptVariation('${id}')">
+            <span class="material-symbols-outlined text-[14px]">check</span> Accept
+          </button>
+          <button class="flex-1 flex items-center justify-center gap-0.5 py-1 bg-red-500/10 text-red-400 rounded-md text-[10px] font-bold hover:bg-red-500/20 transition-colors" onclick="event.stopPropagation(); rejectVariation('${id}')">
+            <span class="material-symbols-outlined text-[14px]">close</span> Reject
+          </button>
+          <button class="p-1 text-txt-muted hover:text-brand rounded-md hover:bg-bg transition-colors" onclick="event.stopPropagation(); toggleSampleFavorite('${id}')">
+            <span class="material-symbols-outlined text-[14px] ${s.isFavorite ? 'fill-1 text-brand' : ''}">favorite</span>
+          </button>
+        </div>` : s.status === 'accepted' ? `
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] text-emerald-400 font-bold">Accepted</span>
+          <button class="p-1 text-txt-muted hover:text-brand rounded-md" onclick="event.stopPropagation(); toggleSampleFavorite('${id}')">
+            <span class="material-symbols-outlined text-[14px] ${s.isFavorite ? 'fill-1 text-brand' : ''}">favorite</span>
+          </button>
+        </div>` : `
+        <div class="text-[10px] text-red-400 font-bold">${s.rejectionFeedback && s.rejectionFeedback !== 'skip' ? 'Rejected: ' + s.rejectionFeedback.replace('_', ' ') : 'Rejected'}</div>`}
+      </div>
+    </div>`;
+}
+
+function renderStackRow(s) {
+  const id = s.id;
+  const statusClass = s.status === 'accepted' ? 'accepted' : s.status === 'rejected' ? 'rejected' : '';
+  const playingClass = state.currentSample === id ? 'playing' : '';
+  const meta = s.type === 'loop' ? `${s.bpm} BPM / ${s.key} / ${s.bars} bars` : `${s.tuning} / ${s.attack} / ${s.timbre}`;
+  const typeBadge = s.type === 'loop' ? 'badge-loop' : 'badge-oneshot';
+  const favClass = s.isFavorite ? 'fill-1 text-brand' : '';
+  return `
+    <div class="variation-card ${statusClass} ${playingClass} bg-surface rounded-lg border border-border flex items-center gap-3 pr-3 group cursor-pointer"
+         data-id="${id}" draggable="true" ondragstart="handleDragStart(event,'${id}')" onclick="previewSample('${id}')">
+      <div class="relative w-28 h-14 flex-shrink-0 bg-bg rounded-l-lg overflow-hidden">
+        <canvas class="var-waveform w-full h-full" data-id="${id}"></canvas>
+        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+          <div class="w-7 h-7 bg-brand/90 rounded-full flex items-center justify-center">
+            <span class="material-symbols-outlined text-[16px] fill-1 text-txt">${state.currentSample === id && state.isPlaying ? 'pause' : 'play_arrow'}</span>
+          </div>
+        </div>
+        <span class="absolute top-1 left-1 px-1 py-0.5 rounded text-[8px] font-bold uppercase ${typeBadge}">${s.type}</span>
+      </div>
+      <div class="flex-1 min-w-0 py-2">
+        <p class="text-xs font-bold truncate">${s.name}</p>
+        <p class="text-[10px] text-txt-dim truncate">${meta}</p>
+      </div>
+      <span class="text-[10px] font-mono text-txt-dim flex-shrink-0">${formatTime(s.duration)}</span>
+      ${s.status === 'accepted' ? `
+      <span class="text-[10px] text-emerald-400 font-bold flex-shrink-0 w-16 text-center">Accepted</span>` : s.status === 'rejected' ? `
+      <span class="text-[10px] text-red-400 font-bold flex-shrink-0 w-16 text-center">Rejected</span>` : `
+      <div class="flex items-center gap-1 flex-shrink-0">
+        <button class="flex items-center gap-0.5 px-2 py-1 bg-emerald-500/15 text-emerald-400 rounded-md text-[10px] font-bold hover:bg-emerald-500/25 transition-colors" onclick="event.stopPropagation(); acceptVariation('${id}')">
+          <span class="material-symbols-outlined text-[12px]">check</span> Accept
+        </button>
+        <button class="flex items-center gap-0.5 px-2 py-1 bg-red-500/10 text-red-400 rounded-md text-[10px] font-bold hover:bg-red-500/20 transition-colors" onclick="event.stopPropagation(); rejectVariation('${id}')">
+          <span class="material-symbols-outlined text-[12px]">close</span> Reject
+        </button>
+      </div>`}
+      <button class="p-1.5 text-txt-muted hover:text-brand rounded-md flex-shrink-0 transition-colors" onclick="event.stopPropagation(); toggleSampleFavorite('${id}')">
+        <span class="material-symbols-outlined text-[16px] ${favClass}">favorite</span>
+      </button>
+      ${s.status === 'accepted' ? '<span class="material-symbols-outlined text-[14px] text-emerald-500 flex-shrink-0">check_circle</span>' : ''}
+    </div>`;
+}
+
+// ==================== ACCEPT / REJECT ====================
+function acceptVariation(id) {
+  const s = samples[id];
+  if (!s || s.status !== 'pending') return;
+  s.status = 'accepted';
+  s.acceptedAt = Date.now();
+  s.isInLibrary = true;
+  const session = sessions[s.generationSessionId];
+  if (session) session.acceptedCount++;
+  decisions.push({ sampleId: id, action: 'accept', timestamp: Date.now() });
+  saveData();
+  renderVariations();
+  showToast('Sample accepted & added to library!');
+}
+
+function rejectVariation(id) {
+  state.rejectingSampleId = id;
+  document.getElementById('reject-modal').classList.add('open');
+}
+
+function submitReject(feedback) {
+  const id = state.rejectingSampleId;
+  if (!id) return;
+  const s = samples[id];
+  if (s) {
+    s.status = 'rejected';
+    s.rejectionFeedback = feedback;
+    const session = sessions[s.generationSessionId];
+    if (session) session.rejectedCount++;
+    decisions.push({ sampleId: id, action: 'reject', feedback, timestamp: Date.now() });
+  }
+  closeModal();
+  saveData();
+  renderVariations();
+  showToast('Sample rejected' + (feedback !== 'skip' ? ' — feedback recorded' : ''));
+}
+
+function acceptAllPending() {
+  let count = 0;
+  Object.keys(samples).forEach(id => {
+    const s = samples[id];
+    if (s && s.status === 'pending' && s.projectId === currentProjectId) {
+      s.status = 'accepted'; s.acceptedAt = Date.now(); s.isInLibrary = true;
+      const session = sessions[s.generationSessionId];
+      if (session) session.acceptedCount++;
+      decisions.push({ sampleId: id, action: 'accept', timestamp: Date.now() });
+      count++;
+    }
+  });
+  if (count) { saveData(); renderVariations(); showToast(`${count} samples accepted!`); }
+  else showToast('No pending samples to accept');
+}
+
+// ==================== FAVORITES ====================
+function toggleSampleFavorite(id) {
+  const s = samples[id];
+  if (!s) return;
+  s.isFavorite = !s.isFavorite;
+  s.favoritedAt = s.isFavorite ? Date.now() : null;
+  saveData();
+  showToast(s.isFavorite ? 'Added to favorites' : 'Removed from favorites');
+  if (state.currentPage === 'favorites') renderFavorites();
+  if (state.currentPage === 'generate') renderVariations();
+  if (state.currentPage === 'library') renderLibrary();
+  if (state.currentPage === 'dashboard') renderDashboard();
+  updateInspectorFav();
+  updatePlayerFav();
+}
+
+function updateInspectorFav() {
+  const s = samples[state.inspectedSample];
+  if (s) {
+    const icon = document.getElementById('inspector-fav-icon');
+    icon.classList.toggle('fill-1', s.isFavorite);
+    icon.classList.toggle('text-brand', s.isFavorite);
+  }
+}
+
+function updatePlayerFav() {
+  const s = samples[state.currentSample];
+  if (s) {
+    const btn = document.getElementById('player-fav-btn');
+    const icon = btn.querySelector('.material-symbols-outlined');
+    icon.classList.toggle('fill-1', s.isFavorite);
+    btn.classList.toggle('text-brand', s.isFavorite);
+    btn.classList.toggle('text-txt-muted', !s.isFavorite);
+  }
+}
+
+function togglePlayerFav() {
+  if (state.currentSample) toggleSampleFavorite(state.currentSample);
+}
+
+// ==================== PLAYBACK ====================
+function previewSample(id) {
+  const s = samples[id];
+  if (!s) return;
+
+  if (state.currentSample === id) { togglePlayPause(); return; }
+
+  state.currentSample = id;
+  state.currentTime = 0;
+  state.totalTime = s.duration;
+  state.isPlaying = true;
+
   document.getElementById('player-bar').style.display = 'block';
-  document.getElementById('player-title').textContent = name;
-  document.getElementById('player-artist').textContent = artist;
-  document.getElementById('player-art').className = 'w-14 h-14 rounded-lg bg-gradient-to-br ' + gradient + ' shadow-lg flex-shrink-0';
-  document.getElementById('player-total-time').textContent = formatTime(duration);
+  document.getElementById('player-title').textContent = s.name;
+  const meta = s.type === 'loop' ? `${s.bpm} BPM / ${s.key} / ${s.bars} bars` : `${s.tuning} / ${s.attack}`;
+  document.getElementById('player-meta').textContent = meta;
+  document.getElementById('player-total-time').textContent = formatTime(s.duration);
   document.getElementById('player-current-time').textContent = '0:00';
-  document.getElementById('player-progress').style.width = '0%';
-  updatePlayButton(); startProgress();
+  updatePlayButton();
+  updatePlayerFav();
+  startProgress();
+
+  // Draw waveforms in player
+  drawMiniWaveform(document.getElementById('player-mini-waveform'), s.waveformData, '#E85002');
+  drawPlayerWaveform();
+
+  // Open inspector
+  openInspector(id);
+
+  // Update variation card highlights
+  document.querySelectorAll('.variation-card').forEach(card => {
+    card.classList.toggle('playing', card.dataset.id === id);
+  });
 }
 
-function togglePlayPause() { if (!state.currentTrack) return; state.isPlaying = !state.isPlaying; updatePlayButton(); state.isPlaying ? startProgress() : stopProgress(); }
-function updatePlayButton() { document.querySelector('#btn-play .material-symbols-outlined').textContent = state.isPlaying ? 'pause' : 'play_arrow'; }
+function playSampleFromInspector() {
+  if (state.inspectedSample) previewSample(state.inspectedSample);
+}
+
+function togglePlayPause() {
+  if (!state.currentSample) return;
+  state.isPlaying = !state.isPlaying;
+  updatePlayButton();
+  state.isPlaying ? startProgress() : stopProgress();
+}
+
+function updatePlayButton() {
+  document.querySelector('#btn-play .material-symbols-outlined').textContent = state.isPlaying ? 'pause' : 'play_arrow';
+  const inspIcon = document.getElementById('inspector-play-icon');
+  if (inspIcon) inspIcon.textContent = state.isPlaying ? 'pause' : 'play_arrow';
+}
 
 function startProgress() {
   stopProgress();
   state.progressInterval = setInterval(() => {
     if (state.currentTime < state.totalTime) {
-      state.currentTime++;
-      document.getElementById('player-progress').style.width = (state.currentTime/state.totalTime*100)+'%';
+      state.currentTime += 0.05;
+      const pct = state.currentTime / state.totalTime;
       document.getElementById('player-current-time').textContent = formatTime(state.currentTime);
-    } else { if (state.repeat) state.currentTime=0; else { state.isPlaying=false; updatePlayButton(); stopProgress(); } }
-  }, 1000);
-}
-function stopProgress() { if (state.progressInterval) { clearInterval(state.progressInterval); state.progressInterval=null; } }
-
-function seekTo(e) {
-  if (!state.currentTrack) return;
-  const r=e.currentTarget.getBoundingClientRect(); const p=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
-  state.currentTime=Math.floor(p*state.totalTime);
-  document.getElementById('player-progress').style.width=(p*100)+'%';
-  document.getElementById('player-current-time').textContent=formatTime(state.currentTime);
+      drawPlayerWaveform(pct);
+    } else {
+      if (state.loopPlayback) { state.currentTime = 0; }
+      else { state.isPlaying = false; updatePlayButton(); stopProgress(); }
+    }
+  }, 50);
 }
 
-function nextTrack(){showToast('Next track')} function prevTrack(){showToast('Previous track')}
-function toggleShuffle(){state.shuffle=!state.shuffle;document.getElementById('btn-shuffle').classList.toggle('text-brand',state.shuffle);document.getElementById('btn-shuffle').classList.toggle('text-txt-muted',!state.shuffle);showToast(state.shuffle?'Shuffle on':'Shuffle off')}
-function toggleRepeat(){state.repeat=!state.repeat;document.getElementById('btn-repeat').classList.toggle('text-brand',state.repeat);document.getElementById('btn-repeat').classList.toggle('text-txt-muted',!state.repeat);showToast(state.repeat?'Repeat on':'Repeat off')}
-function setVolume(v){state.volume=parseInt(v);state.isMuted=false;updateVolumeIcon()}
-function toggleMute(){state.isMuted=!state.isMuted;document.getElementById('volume-slider').value=state.isMuted?0:state.volume;updateVolumeIcon()}
-function updateVolumeIcon(){const i=document.getElementById('volume-icon');const v=state.isMuted?0:state.volume;i.textContent=v===0?'volume_off':v<40?'volume_down':'volume_up'}
+function stopProgress() { if (state.progressInterval) { clearInterval(state.progressInterval); state.progressInterval = null; } }
+
+function drawPlayerWaveform(progress) {
+  const s = samples[state.currentSample];
+  if (!s) return;
+  drawWaveform(document.getElementById('player-waveform'), s.waveformData, '#E85002', progress || 0);
+}
+
+function seekSample(e) {
+  if (!state.currentSample) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  const p = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+  state.currentTime = p * state.totalTime;
+  document.getElementById('player-current-time').textContent = formatTime(state.currentTime);
+  drawPlayerWaveform(p);
+}
+
+function toggleLoopPlayback() {
+  state.loopPlayback = !state.loopPlayback;
+  document.getElementById('btn-loop').classList.toggle('text-brand', state.loopPlayback);
+  document.getElementById('btn-loop').classList.toggle('text-txt-muted', !state.loopPlayback);
+  const inspBtn = document.getElementById('inspector-loop-btn');
+  if (inspBtn) {
+    inspBtn.classList.toggle('text-brand', state.loopPlayback);
+    inspBtn.classList.toggle('text-txt-muted', !state.loopPlayback);
+  }
+  showToast(state.loopPlayback ? 'Loop on' : 'Loop off');
+}
+
+function setVolume(v) { state.volume = parseInt(v); state.isMuted = false; updateVolumeIcon(); }
+function toggleMute() { state.isMuted = !state.isMuted; document.getElementById('volume-slider').value = state.isMuted ? 0 : state.volume; updateVolumeIcon(); }
+function updateVolumeIcon() { const i = document.getElementById('volume-icon'); const v = state.isMuted ? 0 : state.volume; i.textContent = v === 0 ? 'volume_off' : v < 40 ? 'volume_down' : 'volume_up'; }
+
+// ==================== INSPECTOR ====================
+function openInspector(id) {
+  const s = samples[id];
+  if (!s) return;
+  state.inspectedSample = id;
+  document.getElementById('inspector-panel').style.display = 'flex';
+  document.getElementById('inspector-title').textContent = s.name;
+  const badge = document.getElementById('inspector-type-badge');
+  badge.textContent = s.type === 'loop' ? 'Loop' : 'One-Shot';
+  badge.className = 'px-2 py-0.5 rounded text-[10px] font-bold uppercase ' + (s.type === 'loop' ? 'badge-loop' : 'badge-oneshot');
+  const meta = s.type === 'loop' ? `${s.bpm} BPM / ${s.key} / ${s.bars} bars / ${formatTime(s.duration)}` : `${s.tuning} / ${s.attack} / ${s.timbre} / ${formatTime(s.duration)}`;
+  document.getElementById('inspector-meta').textContent = meta;
+
+  // Draw waveform
+  requestAnimationFrame(() => {
+    drawWaveform(document.getElementById('inspector-waveform'), s.waveformData, '#E85002');
+  });
+
+  // Effects sliders
+  document.querySelectorAll('#inspector-panel .effect-slider').forEach(slider => {
+    const fx = slider.dataset.fx;
+    if (fx && s.effects[fx] !== undefined) {
+      slider.value = s.effects[fx];
+      slider.nextElementSibling.textContent = s.effects[fx] + '%';
+    }
+  });
+
+  // Tags
+  const tagsEl = document.getElementById('inspector-tags');
+  tagsEl.innerHTML = s.tags.map(t => `<span class="px-2 py-1 bg-surface border border-border rounded text-[10px] text-txt-muted">${t}</span>`).join('') +
+    `<button class="px-2 py-1 bg-bg border border-border rounded text-[10px] text-brand hover:bg-surface transition-colors" onclick="addTagPrompt()">+ Add</button>`;
+
+  // Notes
+  document.getElementById('inspector-notes').value = s.notes || '';
+
+  // Favorite icon
+  updateInspectorFav();
+}
+
+function closeInspector() {
+  document.getElementById('inspector-panel').style.display = 'none';
+  state.inspectedSample = null;
+}
+
+function updateEffect(slider) {
+  const val = slider.value;
+  slider.nextElementSibling.textContent = val + '%';
+}
+
+function resetEffects() {
+  document.querySelectorAll('#inspector-panel .effect-slider').forEach(slider => {
+    const fx = slider.dataset.fx;
+    slider.value = fx === 'filterLP' ? 100 : 0;
+    slider.nextElementSibling.textContent = slider.value + '%';
+  });
+  showToast('Effects reset');
+}
+
+function applyEffects() {
+  const s = samples[state.inspectedSample];
+  if (!s) return;
+  document.querySelectorAll('#inspector-panel .effect-slider').forEach(slider => {
+    const fx = slider.dataset.fx;
+    if (fx) s.effects[fx] = parseInt(slider.value);
+  });
+  saveData();
+  showToast('Effects saved!');
+}
+
+function updateSampleNotes() {
+  const s = samples[state.inspectedSample];
+  if (s) { s.notes = document.getElementById('inspector-notes').value; saveData(); }
+}
+
+function addTagPrompt() {
+  const tag = prompt('Add a tag:');
+  if (tag && tag.trim()) {
+    const s = samples[state.inspectedSample];
+    if (s) { s.tags.push(tag.trim()); saveData(); openInspector(state.inspectedSample); }
+  }
+}
+
+function batchFromSample() {
+  if (!state.inspectedSample) return;
+  const s = samples[state.inspectedSample];
+  if (!s) return;
+  // Pre-fill params from this sample
+  if (s.type === 'loop') {
+    setGenerateMode('loop');
+    document.getElementById('bpm-input').value = s.bpm || 120;
+    document.getElementById('bpm-slider').value = s.bpm || 120;
+    document.getElementById('key-select').value = s.key || 'C';
+  } else {
+    setGenerateMode('oneshot');
+    document.getElementById('tuning-select').value = s.tuning || 'C4';
+  }
+  showToast('Generating more variations from this sample...');
+  generateSamples();
+}
+
+// ==================== LIBRARY ====================
+function getLibrarySamples() {
+  let list = Object.values(samples).filter(s => s.isInLibrary && s.status === 'accepted' && s.projectId === currentProjectId);
+  const search = (document.getElementById('lib-search')?.value || '').toLowerCase();
+  const type = state.libraryType;
+  const key = document.getElementById('lib-key-filter')?.value;
+  const sort = document.getElementById('lib-sort')?.value;
+
+  if (search) list = list.filter(s => s.name.toLowerCase().includes(search) || s.tags.some(t => t.toLowerCase().includes(search)) || (s.key || '').toLowerCase().includes(search));
+  if (type !== 'all') list = list.filter(s => s.type === type);
+  if (key && key !== 'all') list = list.filter(s => s.key === key);
+
+  if (sort === 'recent') list.sort((a, b) => b.createdAt - a.createdAt);
+  else if (sort === 'oldest') list.sort((a, b) => a.createdAt - b.createdAt);
+  else if (sort === 'name') list.sort((a, b) => a.name.localeCompare(b.name));
+  else if (sort === 'bpm') list.sort((a, b) => (a.bpm || 0) - (b.bpm || 0));
+  return list;
+}
 
 function renderLibrary() {
-  const tbody=document.getElementById('library-tbody');
-  const search=(document.getElementById('library-search')?.value||'').toLowerCase();
-  let tracks=[...libraryTracks];
-  if(state.libraryFilter==='public')tracks=tracks.filter(t=>t.status==='public');
-  else if(state.libraryFilter==='private')tracks=tracks.filter(t=>t.status==='private');
-  if(search)tracks=tracks.filter(t=>t.name.toLowerCase().includes(search)||t.genre.toLowerCase().includes(search)||t.artist.toLowerCase().includes(search));
-  if(state.librarySortOrder==='recent')tracks.sort((a,b)=>b.dateVal-a.dateVal);
-  else if(state.librarySortOrder==='oldest')tracks.sort((a,b)=>a.dateVal-b.dateVal);
-  else if(state.librarySortOrder==='name')tracks.sort((a,b)=>a.name.localeCompare(b.name));
-  tbody.innerHTML=tracks.map(t=>`
-    <tr class="group hover:bg-surface/40 transition-colors cursor-pointer" onclick="playTrack('${t.name}','${t.artist}','${t.gradient}',${t.duration})">
-      <td class="px-6 py-4"><div class="flex items-center gap-4"><div class="size-12 rounded-lg relative overflow-hidden group/thumb"><div class="absolute inset-0 bg-gradient-to-br ${t.gradient}"></div><div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 bg-black/50 transition-opacity"><span class="material-symbols-outlined text-txt">play_arrow</span></div></div><div><p class="font-bold text-sm">${t.name}</p><p class="text-xs text-txt-muted">${t.artist}</p></div></div></td>
-      <td class="px-6 py-4 text-sm text-txt-muted">${t.date}</td>
-      <td class="px-6 py-4"><span class="px-3 py-1 bg-surface border border-border rounded-full text-xs font-medium text-txt-muted">${t.genre}</span></td>
-      <td class="px-6 py-4 text-center">${t.status==='public'?'<span class="px-3 py-1 badge-public rounded-full text-xs font-bold">Public</span>':'<span class="px-3 py-1 badge-private rounded-full text-xs font-bold">Private</span>'}</td>
-      <td class="px-6 py-4 text-right"><div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity"><button class="p-2 hover:bg-dk-gray rounded-lg transition-colors text-txt-muted" onclick="event.stopPropagation();showToast('Share link copied!')"><span class="material-symbols-outlined text-[20px]">share</span></button><button class="p-2 hover:bg-dk-gray rounded-lg transition-colors text-txt-muted" onclick="event.stopPropagation();showToast('Downloading...')"><span class="material-symbols-outlined text-[20px]">download</span></button><button class="p-2 hover:bg-dk-gray rounded-lg transition-colors text-txt-muted" onclick="event.stopPropagation();showToast('Track options')"><span class="material-symbols-outlined text-[20px]">more_vert</span></button></div></td>
-    </tr>`).join('');
-  if(!tracks.length) tbody.innerHTML='<tr><td colspan="5" class="px-6 py-12 text-center text-txt-muted">No tracks found.</td></tr>';
+  const list = getLibrarySamples();
+  const gridEl = document.getElementById('lib-grid');
+  const listEl = document.getElementById('lib-list');
+  const emptyEl = document.getElementById('lib-empty');
+
+  if (!list.length) {
+    gridEl.classList.add('hidden'); listEl.classList.add('hidden'); emptyEl.classList.remove('hidden');
+    return;
+  }
+  emptyEl.classList.add('hidden');
+
+  if (state.libraryView === 'grid') {
+    gridEl.classList.remove('hidden'); listEl.classList.add('hidden');
+    gridEl.innerHTML = list.map(s => renderSampleCard(s)).join('');
+    requestAnimationFrame(() => {
+      gridEl.querySelectorAll('.lib-waveform').forEach(canvas => {
+        const s = samples[canvas.dataset.id];
+        if (s) drawWaveform(canvas, s.waveformData, '#E85002');
+      });
+    });
+  } else {
+    gridEl.classList.add('hidden'); listEl.classList.remove('hidden');
+    document.getElementById('lib-tbody').innerHTML = list.map(s => `
+      <tr class="group hover:bg-surface/40 transition-colors cursor-pointer" onclick="previewSample('${s.id}')">
+        <td class="px-4 py-3" onclick="event.stopPropagation()"><input type="checkbox" class="rounded border-border" ${state.selectedSamples.has(s.id) ? 'checked' : ''} onchange="toggleSampleSelect('${s.id}')"/></td>
+        <td class="px-4 py-3"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded bg-bg overflow-hidden"><canvas class="lib-waveform-row w-full h-full" data-id="${s.id}" width="40" height="40"></canvas></div><span class="font-bold text-sm">${s.name}</span></div></td>
+        <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${s.type === 'loop' ? 'badge-loop' : 'badge-oneshot'}">${s.type}</span></td>
+        <td class="px-4 py-3 text-sm text-txt-muted">${s.key || '-'}</td>
+        <td class="px-4 py-3 text-sm text-txt-muted">${s.bpm || '-'}</td>
+        <td class="px-4 py-3 text-sm text-txt-muted font-mono">${formatTime(s.duration)}</td>
+        <td class="px-4 py-3 text-right"><div class="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button class="p-1.5 hover:bg-dk-gray rounded-lg text-txt-muted hover:text-brand" onclick="event.stopPropagation(); toggleSampleFavorite('${s.id}')"><span class="material-symbols-outlined text-[18px] ${s.isFavorite ? 'fill-1 text-brand' : ''}">favorite</span></button>
+          <button class="p-1.5 hover:bg-dk-gray rounded-lg text-txt-muted" onclick="event.stopPropagation(); downloadSample('${s.id}')"><span class="material-symbols-outlined text-[18px]">download</span></button>
+          <button class="p-1.5 hover:bg-dk-gray rounded-lg text-txt-muted" onclick="event.stopPropagation(); deleteSampleConfirm('${s.id}')"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+        </div></td>
+      </tr>`).join('');
+    requestAnimationFrame(() => {
+      document.querySelectorAll('.lib-waveform-row').forEach(c => {
+        const s = samples[c.dataset.id];
+        if (s) drawMiniWaveform(c, s.waveformData, '#E85002');
+      });
+    });
+  }
+  updateBatchBar();
 }
 
-function filterLibrary(){renderLibrary()}
-function setLibraryFilter(f,btn){state.libraryFilter=f;document.querySelectorAll('.filter-btn').forEach(b=>{b.classList.remove('active');if(!b.classList.contains('bg-surface'))b.classList.add('bg-surface')});btn.classList.add('active');btn.classList.remove('bg-surface');renderLibrary()}
-function setSortOrder(o){state.librarySortOrder=o;document.querySelectorAll('.dropdown').forEach(d=>d.classList.remove('open'));renderLibrary();showToast('Sorted by '+o)}
-function toggleSortDropdown(btn){const dd=btn.querySelector('.dropdown');dd.classList.toggle('open');setTimeout(()=>{const h=e=>{if(!btn.contains(e.target)){dd.classList.remove('open');document.removeEventListener('click',h)}};document.addEventListener('click',h)},10)}
-
-function toggleGenreChip(el){
-  const g=el.dataset.genre;
-  if(g==='all'){document.querySelectorAll('#home-genres .genre-chip').forEach(c=>{c.classList.remove('selected');if(!c.classList.contains('bg-surface'))c.classList.add('bg-surface')});el.classList.add('selected');el.classList.remove('bg-surface')}
-  else{const a=document.querySelector('#home-genres .genre-chip[data-genre="all"]');a.classList.remove('selected');if(!a.classList.contains('bg-surface'))a.classList.add('bg-surface');el.classList.toggle('selected');if(!el.classList.contains('selected')){if(!el.classList.contains('bg-surface'))el.classList.add('bg-surface')}else el.classList.remove('bg-surface')}
-  filterHomeContent();
+function renderSampleCard(s) {
+  const meta = s.type === 'loop' ? `${s.bpm} BPM / ${s.key} / ${s.bars} bars` : `${s.tuning} / ${s.attack}`;
+  return `
+    <div class="sample-card group bg-panel p-3 rounded-2xl border border-border cursor-pointer ${state.selectedSamples.has(s.id) ? 'selected' : ''}"
+         data-id="${s.id}" draggable="true" ondragstart="handleDragStart(event,'${s.id}')" onclick="previewSample('${s.id}')">
+      <div class="relative rounded-xl overflow-hidden mb-3 bg-bg h-24">
+        <canvas class="lib-waveform w-full h-full" data-id="${s.id}"></canvas>
+        <div class="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div class="w-10 h-10 bg-brand text-txt rounded-full flex items-center justify-center">
+            <span class="material-symbols-outlined text-[24px] fill-1">play_arrow</span>
+          </div>
+        </div>
+        <span class="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/75 text-[10px] font-mono text-txt rounded">${formatTime(s.duration)}</span>
+        <span class="absolute top-2 left-2 px-2 py-0.5 bg-black/70 text-[10px] font-bold rounded uppercase ${s.type === 'loop' ? 'text-brand' : 'text-blue-400'}">${s.type}</span>
+      </div>
+      <div class="flex items-center justify-between">
+        <div class="min-w-0 flex-1">
+          <h4 class="font-bold text-sm truncate">${s.name}</h4>
+          <p class="text-[10px] text-txt-muted">${meta}</p>
+        </div>
+        <button class="p-1.5 text-txt-muted hover:text-brand flex-shrink-0" onclick="event.stopPropagation(); toggleSampleFavorite('${s.id}')">
+          <span class="material-symbols-outlined text-[18px] ${s.isFavorite ? 'fill-1 text-brand' : ''}">favorite</span>
+        </button>
+      </div>
+    </div>`;
 }
-function filterHomeContent(){
-  const search=(document.getElementById('home-search')?.value||'').toLowerCase();
-  const sel=[...document.querySelectorAll('#home-genres .genre-chip.selected')].map(c=>c.dataset.genre);
-  const isAll=sel.includes('all')||sel.length===0;
-  document.querySelectorAll('#trending-section .grid > div').forEach(card=>{
-    const t=card.textContent.toLowerCase(); const g=(card.dataset.genres||'').toLowerCase();
-    card.style.display=(!search||t.includes(search))&&(isAll||sel.some(s=>g.includes(s)))?'':'none';
+
+function setLibType(type, btn) {
+  state.libraryType = type;
+  btn.closest('.flex').querySelectorAll('.param-chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  renderLibrary();
+}
+
+function setLibView(view) {
+  state.libraryView = view;
+  document.getElementById('lib-grid-btn').classList.toggle('text-brand', view === 'grid');
+  document.getElementById('lib-grid-btn').classList.toggle('text-txt-muted', view !== 'grid');
+  document.getElementById('lib-grid-btn').classList.toggle('bg-surface', view === 'grid');
+  document.getElementById('lib-grid-btn').classList.toggle('border', view === 'grid');
+  document.getElementById('lib-grid-btn').classList.toggle('border-border', view === 'grid');
+  document.getElementById('lib-list-btn').classList.toggle('text-brand', view === 'list');
+  document.getElementById('lib-list-btn').classList.toggle('text-txt-muted', view !== 'list');
+  document.getElementById('lib-list-btn').classList.toggle('bg-surface', view === 'list');
+  document.getElementById('lib-list-btn').classList.toggle('border', view === 'list');
+  document.getElementById('lib-list-btn').classList.toggle('border-border', view === 'list');
+  renderLibrary();
+}
+
+function toggleSampleSelect(id) {
+  if (state.selectedSamples.has(id)) state.selectedSamples.delete(id);
+  else state.selectedSamples.add(id);
+  updateBatchBar();
+  renderLibrary();
+}
+
+function toggleSelectAll(checkbox) {
+  const list = getLibrarySamples();
+  if (checkbox.checked) list.forEach(s => state.selectedSamples.add(s.id));
+  else state.selectedSamples.clear();
+  updateBatchBar();
+  renderLibrary();
+}
+
+function updateBatchBar() {
+  const bar = document.getElementById('lib-batch-bar');
+  if (state.selectedSamples.size > 0) {
+    bar.classList.remove('hidden');
+    document.getElementById('batch-count').textContent = state.selectedSamples.size;
+    bar.style.bottom = state.currentSample ? '64px' : '0px';
+  } else {
+    bar.classList.add('hidden');
+  }
+}
+
+function downloadSample(id) {
+  showToast('Downloading ' + (samples[id]?.name || 'sample') + '...');
+}
+
+function downloadSelectedAsZip() {
+  if (state.selectedSamples.size === 0) return;
+  showToast(`Preparing ZIP with ${state.selectedSamples.size} samples...`);
+  setTimeout(() => showToast('ZIP downloaded!'), 1500);
+}
+
+function favoriteSelected() {
+  state.selectedSamples.forEach(id => {
+    const s = samples[id]; if (s && !s.isFavorite) { s.isFavorite = true; s.favoritedAt = Date.now(); }
+  });
+  saveData(); renderLibrary(); showToast(`${state.selectedSamples.size} samples favorited`);
+}
+
+function deleteSampleConfirm(id) {
+  const s = samples[id]; if (!s) return;
+  document.getElementById('confirm-title').textContent = 'Delete Sample';
+  document.getElementById('confirm-msg').textContent = `Are you sure you want to delete "${s.name}"?`;
+  document.getElementById('confirm-action').onclick = () => { deleteSample(id); closeModal(); };
+  document.getElementById('confirm-modal').classList.add('open');
+}
+
+function deleteSample(id) {
+  delete samples[id];
+  state.selectedSamples.delete(id);
+  saveData();
+  if (state.currentSample === id) { state.currentSample = null; document.getElementById('player-bar').style.display = 'none'; }
+  if (state.inspectedSample === id) closeInspector();
+  renderLibrary();
+  showToast('Sample deleted');
+}
+
+function deleteSelected() {
+  if (state.selectedSamples.size === 0) return;
+  document.getElementById('confirm-title').textContent = 'Delete Samples';
+  document.getElementById('confirm-msg').textContent = `Delete ${state.selectedSamples.size} selected samples?`;
+  document.getElementById('confirm-action').onclick = () => {
+    state.selectedSamples.forEach(id => delete samples[id]);
+    state.selectedSamples.clear();
+    saveData(); closeModal(); renderLibrary(); showToast('Samples deleted');
+  };
+  document.getElementById('confirm-modal').classList.add('open');
+}
+
+// ==================== FAVORITES PAGE ====================
+function renderFavorites() {
+  let list = Object.values(samples).filter(s => s.isFavorite && s.projectId === currentProjectId);
+  const search = (document.getElementById('fav-search')?.value || '').toLowerCase();
+  const sort = document.getElementById('fav-sort')?.value || 'fav-recent';
+
+  if (search) list = list.filter(s => s.name.toLowerCase().includes(search) || s.tags.some(t => t.toLowerCase().includes(search)));
+
+  if (sort === 'fav-recent') list.sort((a, b) => (b.favoritedAt || 0) - (a.favoritedAt || 0));
+  else if (sort === 'recent') list.sort((a, b) => b.createdAt - a.createdAt);
+  else if (sort === 'name') list.sort((a, b) => a.name.localeCompare(b.name));
+  else if (sort === 'bpm') list.sort((a, b) => (a.bpm || 0) - (b.bpm || 0));
+
+  document.getElementById('fav-count').textContent = list.length;
+
+  if (!list.length) {
+    document.getElementById('fav-grid').classList.add('hidden');
+    document.getElementById('fav-empty').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('fav-empty').classList.add('hidden');
+  document.getElementById('fav-grid').classList.remove('hidden');
+  document.getElementById('fav-grid').innerHTML = list.map(s => renderSampleCard(s)).join('');
+  requestAnimationFrame(() => {
+    document.getElementById('fav-grid').querySelectorAll('.lib-waveform').forEach(canvas => {
+      const s = samples[canvas.dataset.id];
+      if (s) drawWaveform(canvas, s.waveformData, '#E85002');
+    });
   });
 }
 
-function toggleCreateGenre(el){
-  el.classList.toggle('selected');
-  if(el.classList.contains('selected')){el.classList.add('border-brand','bg-brand/15','text-brand');el.classList.remove('bg-bg','border-border','text-txt-muted')}
-  else{el.classList.remove('border-brand','bg-brand/15','text-brand');el.classList.add('bg-bg','border-border','text-txt-muted')}
+// ==================== HISTORY PAGE ====================
+function renderHistory() {
+  const search = (document.getElementById('hist-search')?.value || '').toLowerCase();
+  const typeFilter = document.getElementById('hist-type-filter')?.value || 'all';
+  let list = Object.values(sessions).filter(s => s.projectId === currentProjectId);
+
+  if (search) list = list.filter(s => JSON.stringify(s.params).toLowerCase().includes(search));
+  if (typeFilter !== 'all') list = list.filter(s => s.type === typeFilter);
+  list.sort((a, b) => b.createdAt - a.createdAt);
+
+  if (!list.length) {
+    document.getElementById('hist-timeline').classList.add('hidden');
+    document.getElementById('hist-empty').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('hist-empty').classList.add('hidden');
+  document.getElementById('hist-timeline').classList.remove('hidden');
+
+  // Group by date
+  const groups = {};
+  list.forEach(s => {
+    const d = new Date(s.createdAt);
+    const today = new Date();
+    let label;
+    if (d.toDateString() === today.toDateString()) label = 'Today';
+    else {
+      const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+      if (d.toDateString() === yesterday.toDateString()) label = 'Yesterday';
+      else label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+    if (!groups[label]) groups[label] = [];
+    groups[label].push(s);
+  });
+
+  document.getElementById('hist-timeline').innerHTML = Object.entries(groups).map(([label, items]) => `
+    <div class="mb-6">
+      <h4 class="text-xs font-bold text-txt-dim uppercase tracking-wider mb-3">${label}</h4>
+      <div class="space-y-3">
+        ${items.map(s => {
+          const p = s.params;
+          const paramStr = s.type === 'loop'
+            ? `${p.bpm} BPM / ${p.key} / ${p.bars} bars${p.styles?.length ? ' / ' + p.styles.join(', ') : ''}`
+            : `${p.tuning} / ${p.attack} / ${p.timbre}${p.styles?.length ? ' / ' + p.styles.join(', ') : ''}`;
+          const time = new Date(s.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+          return `
+          <div class="history-item">
+            <div class="history-dot ${s.type}"></div>
+            <div class="bg-panel border border-border rounded-xl p-4">
+              <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${s.type === 'loop' ? 'badge-loop' : 'badge-oneshot'}">${s.type}</span>
+                  <span class="text-sm font-bold">${s.variationIds.length} variations</span>
+                </div>
+                <span class="text-xs text-txt-dim">${time}</span>
+              </div>
+              <p class="text-xs text-txt-muted mb-3">${paramStr}</p>
+              <div class="flex items-center gap-4 text-xs">
+                <span class="text-emerald-400">Accepted: ${s.acceptedCount}</span>
+                <span class="text-red-400">Rejected: ${s.rejectedCount}</span>
+                <span class="text-txt-dim">Pending: ${s.variationIds.length - s.acceptedCount - s.rejectedCount}</span>
+              </div>
+              <div class="flex gap-2 mt-3">
+                <button class="text-xs text-brand hover:underline" onclick="viewSessionVariations('${s.id}')">View Variations</button>
+                <button class="text-xs text-txt-muted hover:text-txt" onclick="regenerateSession('${s.id}')">Re-generate</button>
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`).join('');
 }
 
-function generateTrack(){
-  const prompt=document.getElementById('create-prompt').value||'AI generated track';
-  const list=document.getElementById('generations-list');
-  const gc=document.createElement('div');
-  gc.className='bg-panel border border-border border-dashed rounded-2xl p-5 flex items-center gap-6 animate-fadeIn';
-  gc.innerHTML=`<div class="size-20 shrink-0 bg-bg rounded-xl flex items-center justify-center"><span class="material-symbols-outlined text-txt-dim animate-spin">refresh</span></div><div class="flex-1"><div class="flex items-center justify-between mb-2"><div class="h-4 w-40 bg-bg rounded animate-pulse"></div><div class="h-4 w-12 bg-bg rounded animate-pulse"></div></div><div class="h-3 w-full bg-bg rounded mb-4 animate-pulse"></div><div class="w-full h-1 bg-bg rounded-full overflow-hidden"><div class="bg-brand h-full animate-pulse" style="width:45%"></div></div></div>`;
-  list.prepend(gc);showToast('Generating track...');
-  setTimeout(()=>{
-    const grads=['from-pink-500 to-violet-600','from-green-400 to-blue-500','from-[#C10801] to-[#F16001]','from-cyan-400 to-indigo-600','from-brand to-orange-400','from-rose-500 to-brand'];
-    const rg=grads[Math.floor(Math.random()*grads.length)];
-    const names=['Crystal Waves','Sunset Boulevard','Digital Dreams','Cosmic Harmony','Electric Soul','Vapor Trail'];
-    const rn=names[Math.floor(Math.random()*names.length)];const dur=90+Math.floor(Math.random()*180);
-    gc.className='bg-panel border border-brand/30 rounded-2xl p-5 flex items-center gap-6 shadow-xl shadow-brand/5 animate-fadeIn cursor-pointer';
-    gc.onclick=()=>playTrack(rn,'Sonic AI v3.5',rg,dur);
-    gc.innerHTML=`<div class="relative group size-20 shrink-0"><div class="absolute inset-0 bg-gradient-to-br ${rg} rounded-xl opacity-80"></div><button class="absolute inset-0 flex items-center justify-center text-txt opacity-0 group-hover:opacity-100 transition-opacity"><span class="material-symbols-outlined text-4xl fill-1">play_circle</span></button></div><div class="flex-1 min-w-0"><div class="flex items-center justify-between mb-1"><h4 class="font-bold truncate">${rn}</h4><span class="text-xs text-txt-muted">${formatTime(dur)}</span></div><p class="text-txt-muted text-xs mb-3 truncate italic">"${prompt.substring(0,50)}..."</p><div class="flex items-end h-8 gap-[2px]">${Array.from({length:16},()=>`<div class="waveform-bar muted" style="height:${20+Math.random()*80}%"></div>`).join('')}</div></div><div class="flex gap-2"><button class="p-2.5 rounded-lg bg-bg border border-border text-txt-muted hover:text-txt hover:border-brand transition-all" onclick="event.stopPropagation();showToast('Downloading...')"><span class="material-symbols-outlined text-xl">download</span></button><button class="p-2.5 rounded-lg bg-bg border border-border text-txt-muted hover:text-txt hover:border-brand transition-all" onclick="event.stopPropagation();showToast('Share link copied!')"><span class="material-symbols-outlined text-xl">share</span></button></div>`;
-    showToast('Track generated!');
-  },3000);
+function viewSessionVariations(sessionId) {
+  const session = sessions[sessionId];
+  if (!session) return;
+  currentVariations = session.variationIds;
+  navigateTo('generate');
+  // Restore params
+  const p = session.params;
+  setGenerateMode(session.type);
+  if (session.type === 'loop') {
+    document.getElementById('bpm-input').value = p.bpm || 120;
+    document.getElementById('bpm-slider').value = p.bpm || 120;
+    document.getElementById('key-select').value = p.key || 'C';
+  }
+  document.getElementById('gen-empty').classList.add('hidden');
+  document.getElementById('gen-footer').classList.remove('hidden');
+  document.getElementById('gen-var-count').textContent = currentVariations.length + ' variations';
+  renderVariations();
 }
 
-function quickGenerate(){const p=document.getElementById('home-prompt').value;if(p)document.getElementById('create-prompt').value=p;navigateTo('create');if(p)setTimeout(generateTrack,500)}
+function regenerateSession(sessionId) {
+  const session = sessions[sessionId];
+  if (!session) return;
+  navigateTo('generate');
+  const p = session.params;
+  setGenerateMode(session.type);
+  if (session.type === 'loop') {
+    document.getElementById('bpm-input').value = p.bpm || 120;
+    document.getElementById('bpm-slider').value = p.bpm || 120;
+    document.getElementById('key-select').value = p.key || 'C';
+  }
+  generateSamples();
+}
 
-function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000)}
-function toggleFavorite(btn){const i=btn.querySelector('.material-symbols-outlined');if(i.classList.contains('fill-1')){i.classList.remove('fill-1');btn.classList.remove('text-brand');btn.classList.add('text-txt-muted');showToast('Removed from favorites')}else{i.classList.add('fill-1');btn.classList.add('text-brand');btn.classList.remove('text-txt-muted');showToast('Added to favorites')}}
-function closeModal(){document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open'))}
-function copyShareLink(){const i=document.getElementById('share-link');i.select();navigator.clipboard?.writeText(i.value);showToast('Link copied!');closeModal()}
-document.addEventListener('click',e=>{if(!e.target.closest('.dropdown')&&!e.target.closest('[onclick*="toggleSortDropdown"]'))document.querySelectorAll('.dropdown').forEach(d=>d.classList.remove('open'))});
+// ==================== DASHBOARD ====================
+function renderDashboard() {
+  // Recent generations
+  const search = (document.getElementById('dash-search')?.value || '').toLowerCase();
+  let recent = Object.values(samples).filter(s => s.isInLibrary && s.projectId === currentProjectId);
+  if (dashTypeFilter !== 'all') recent = recent.filter(s => s.type === dashTypeFilter);
+  if (search) recent = recent.filter(s => s.name.toLowerCase().includes(search) || s.tags.some(t => t.toLowerCase().includes(search)) || (s.key || '').toLowerCase().includes(search));
+  recent = recent.sort((a, b) => b.createdAt - a.createdAt).slice(0, 8);
+  const grid = document.getElementById('dash-recent-grid');
+  const empty = document.getElementById('dash-empty');
 
-navigateTo('home');
-setTimeout(()=>playTrack('Midnight Drift','EchoPulse AI','from-[#C10801] via-[#F16001] to-[#D9C3AB]',222),500);
+  if (recent.length) {
+    grid.classList.remove('hidden'); empty.classList.add('hidden');
+    grid.innerHTML = recent.map(s => renderSampleCard(s)).join('');
+    requestAnimationFrame(() => {
+      grid.querySelectorAll('.lib-waveform').forEach(canvas => {
+        const s = samples[canvas.dataset.id];
+        if (s) drawWaveform(canvas, s.waveformData, '#E85002');
+      });
+    });
+  } else {
+    grid.classList.add('hidden'); empty.classList.remove('hidden');
+  }
+
+  // Decision count for recommendations
+  const count = decisions.length;
+  document.getElementById('dash-decision-count').textContent = count;
+  if (count >= 50) {
+    document.getElementById('dash-recommendations').classList.remove('hidden');
+    document.getElementById('dash-rec-locked').classList.add('hidden');
+    renderRecommendations();
+  } else {
+    document.getElementById('dash-recommendations').classList.add('hidden');
+    document.getElementById('dash-rec-locked').classList.remove('hidden');
+  }
+
+  // Recent presets
+  const recentSessions = Object.values(sessions).filter(s => s.projectId === currentProjectId).sort((a, b) => b.createdAt - a.createdAt).slice(0, 3);
+  const presetsEl = document.getElementById('dash-presets');
+  presetsEl.innerHTML = recentSessions.map(s => {
+    const p = s.params;
+    const label = s.type === 'loop' ? `${p.bpm} BPM / ${p.key} / ${p.bars} bars` : `${p.tuning} / ${p.attack} / ${p.timbre}`;
+    return `<button class="param-chip text-[11px]" onclick="regenerateSession('${s.id}')">${label}</button>`;
+  }).join('');
+}
+
+function renderRecommendations() {
+  // Simple recommendation based on most accepted params
+  const accepted = decisions.filter(d => d.action === 'accept').map(d => samples[d.sampleId]).filter(s => s && s.projectId === currentProjectId);
+  if (!accepted.length) return;
+
+  const bpms = accepted.filter(s => s.bpm).map(s => s.bpm);
+  const avgBpm = bpms.length ? Math.round(bpms.reduce((a, b) => a + b, 0) / bpms.length) : 120;
+  const keys = accepted.filter(s => s.key).map(s => s.key);
+  const topKey = keys.length ? mode(keys) : 'C';
+
+  document.getElementById('dash-rec-list').innerHTML = `
+    <div class="bg-panel border border-border rounded-xl p-4 flex items-center gap-4 cursor-pointer hover:border-brand transition-colors" onclick="navigateTo('generate')">
+      <div class="w-10 h-10 bg-brand/15 rounded-lg flex items-center justify-center flex-shrink-0">
+        <span class="material-symbols-outlined text-brand">auto_awesome</span>
+      </div>
+      <div>
+        <p class="text-sm font-bold">Try ${avgBpm} BPM in ${topKey}</p>
+        <p class="text-xs text-txt-muted">Based on your most accepted samples</p>
+      </div>
+    </div>`;
+}
+
+function mode(arr) {
+  const freq = {}; arr.forEach(v => freq[v] = (freq[v] || 0) + 1);
+  return Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0];
+}
+
+let dashTypeFilter = 'all';
+function filterDashboard() { renderDashboard(); }
+function setDashTypeFilter(type, btn) {
+  dashTypeFilter = type;
+  btn.closest('#dash-type-chips').querySelectorAll('.param-chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  renderDashboard();
+}
+
+// ==================== DRAG & DROP ====================
+function handleDragStart(event, id) {
+  const s = samples[id];
+  if (!s) return;
+  event.dataTransfer.setData('text/plain', s.name + '.wav');
+  event.dataTransfer.effectAllowed = 'copy';
+  // For DAW integration, set DownloadURL
+  try {
+    event.dataTransfer.setData('DownloadURL', `audio/wav:${s.name}.wav:${window.location.href}`);
+  } catch(e) {}
+}
+
+// ==================== IMPORT FROM PROJECT ====================
+let importSelectedIds = new Set();
+
+function openImportModal() {
+  importSelectedIds.clear();
+  const select = document.getElementById('import-project-select');
+  select.innerHTML = '<option value="">Select a project...</option>';
+  Object.values(projects).filter(p => p.id !== currentProjectId).forEach(p => {
+    const count = Object.values(samples).filter(s => s.projectId === p.id && s.isInLibrary).length;
+    select.innerHTML += `<option value="${p.id}">${p.name} (${count} samples)</option>`;
+  });
+  document.getElementById('import-sample-list').innerHTML = '<p class="text-sm text-txt-dim text-center py-8">Select a project to see its samples</p>';
+  document.getElementById('import-selected-count').textContent = '0';
+  document.getElementById('import-modal').classList.add('open');
+}
+
+function renderImportList() {
+  const projectId = document.getElementById('import-project-select').value;
+  const listEl = document.getElementById('import-sample-list');
+  importSelectedIds.clear();
+  document.getElementById('import-selected-count').textContent = '0';
+
+  if (!projectId) {
+    listEl.innerHTML = '<p class="text-sm text-txt-dim text-center py-8">Select a project to see its samples</p>';
+    return;
+  }
+
+  const projectSamples = Object.values(samples).filter(s => s.projectId === projectId && s.isInLibrary);
+  if (!projectSamples.length) {
+    listEl.innerHTML = '<p class="text-sm text-txt-dim text-center py-8">No samples in this project</p>';
+    return;
+  }
+
+  listEl.innerHTML = projectSamples.map(s => {
+    const meta = s.type === 'loop' ? `${s.bpm} BPM / ${s.key} / ${s.bars} bars` : `${s.tuning} / ${s.attack}`;
+    const typeBadge = s.type === 'loop' ? 'badge-loop' : 'badge-oneshot';
+    return `
+      <label class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-surface transition-colors cursor-pointer border border-transparent has-[:checked]:border-brand/30 has-[:checked]:bg-brand/5">
+        <input type="checkbox" class="rounded border-border text-brand" value="${s.id}" onchange="toggleImportSelect(this)"/>
+        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${typeBadge}">${s.type}</span>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium truncate">${s.name}</p>
+          <p class="text-[10px] text-txt-dim">${meta}</p>
+        </div>
+        <span class="text-[10px] font-mono text-txt-dim">${formatTime(s.duration)}</span>
+      </label>`;
+  }).join('');
+}
+
+function toggleImportSelect(checkbox) {
+  if (checkbox.checked) importSelectedIds.add(checkbox.value);
+  else importSelectedIds.delete(checkbox.value);
+  document.getElementById('import-selected-count').textContent = importSelectedIds.size;
+}
+
+function importSelectedSamples() {
+  if (!importSelectedIds.size) { showToast('No samples selected'); return; }
+  let count = 0;
+  importSelectedIds.forEach(originalId => {
+    const original = samples[originalId];
+    if (!original) return;
+    const newId = uid('smp');
+    samples[newId] = {
+      ...JSON.parse(JSON.stringify(original)),
+      id: newId,
+      projectId: currentProjectId,
+      createdAt: Date.now(),
+      waveformData: [...original.waveformData],
+    };
+    count++;
+  });
+  importSelectedIds.clear();
+  saveData();
+  closeModal();
+  renderLibrary();
+  renderProjectSwitcher();
+  showToast(`${count} sample${count !== 1 ? 's' : ''} imported!`);
+}
+
+// ==================== KEYBOARD SHORTCUTS ====================
+document.addEventListener('keydown', e => {
+  if (e.code === 'Escape') { closeModal(); return; }
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+  if (e.code === 'Space' && state.currentSample) { e.preventDefault(); togglePlayPause(); }
+  if (e.code === 'KeyL') toggleLoopPlayback();
+});
+
+// ==================== SEED DATA ====================
+function seedDemoData() {
+  if (Object.keys(samples).length > 0) return; // already has data
+
+  const sessionId = uid('ses');
+  const sessionId2 = uid('ses');
+  const sessionId3 = uid('ses');
+
+  const demoSamples = [
+    { name: 'Dusty Kick 001', type: 'loop', status: 'accepted', bpm: 90, key: 'Cm', bars: 4, style: ['Dusty', 'Lo-fi'], duration: 5.33, session: sessionId },
+    { name: 'Dusty Kick 002', type: 'loop', status: 'accepted', bpm: 90, key: 'Cm', bars: 4, style: ['Dusty', 'Lo-fi'], duration: 5.33, session: sessionId },
+    { name: 'Dusty Kick 003', type: 'loop', status: 'rejected', bpm: 90, key: 'Cm', bars: 4, style: ['Dusty', 'Lo-fi'], duration: 5.33, session: sessionId, feedback: 'too_muddy' },
+    { name: 'Dusty Kick 004', type: 'loop', status: 'pending', bpm: 90, key: 'Cm', bars: 4, style: ['Dusty', 'Lo-fi'], duration: 5.33, session: sessionId },
+    { name: 'Dusty Kick 005', type: 'loop', status: 'pending', bpm: 90, key: 'Cm', bars: 4, style: ['Dusty', 'Lo-fi'], duration: 5.33, session: sessionId },
+    { name: 'Dusty Kick 006', type: 'loop', status: 'pending', bpm: 90, key: 'Cm', bars: 4, style: ['Dusty', 'Lo-fi'], duration: 5.33, session: sessionId },
+    { name: 'Crispy Hat Loop', type: 'loop', status: 'accepted', bpm: 120, key: 'C', bars: 2, style: ['Crispy', 'Digital'], duration: 2.0, session: sessionId2 },
+    { name: 'Crispy Hat Var 2', type: 'loop', status: 'accepted', bpm: 120, key: 'C', bars: 2, style: ['Crispy', 'Digital'], duration: 2.0, session: sessionId2 },
+    { name: 'Crispy Hat Var 3', type: 'loop', status: 'rejected', bpm: 120, key: 'C', bars: 2, style: ['Crispy', 'Digital'], duration: 2.0, session: sessionId2, feedback: 'too_busy' },
+    { name: 'Crispy Hat Var 4', type: 'loop', status: 'pending', bpm: 120, key: 'C', bars: 2, style: ['Crispy', 'Digital'], duration: 2.0, session: sessionId2 },
+    { name: 'Warm Snare Hit', type: 'oneshot', status: 'accepted', tuning: 'C4', attack: 'Snappy', timbre: 'Warm', style: ['Analog', 'Punchy'], duration: 0.45, session: sessionId3 },
+    { name: 'Warm Snare Var 2', type: 'oneshot', status: 'accepted', tuning: 'C4', attack: 'Snappy', timbre: 'Warm', style: ['Analog', 'Punchy'], duration: 0.52, session: sessionId3 },
+    { name: 'Warm Snare Var 3', type: 'oneshot', status: 'pending', tuning: 'C4', attack: 'Punchy', timbre: 'Warm', style: ['Analog', 'Punchy'], duration: 0.38, session: sessionId3 },
+    { name: 'Warm Snare Var 4', type: 'oneshot', status: 'pending', tuning: 'C4', attack: 'Soft', timbre: 'Dark', style: ['Analog'], duration: 0.61, session: sessionId3 },
+    { name: 'Analog Clap 001', type: 'oneshot', status: 'accepted', tuning: 'D4', attack: 'Transient', timbre: 'Bright', style: ['Analog', 'Crispy'], duration: 0.33, session: sessionId3, fav: true },
+    { name: 'Sub Bass Loop', type: 'loop', status: 'accepted', bpm: 140, key: 'F', bars: 8, style: ['Clean', 'Digital'], duration: 6.86, session: sessionId2, fav: true },
+  ];
+
+  const sessionMap = {};
+  demoSamples.forEach((d, i) => {
+    const id = uid('smp');
+    const ts = Date.now() - (demoSamples.length - i) * 60000;
+    samples[id] = {
+      id, type: d.type, name: d.name, status: d.status,
+      duration: d.duration,
+      bpm: d.bpm || null, key: d.key || null, bars: d.bars || null,
+      tuning: d.tuning || null, attack: d.attack || null, timbre: d.timbre || null,
+      style: d.style || [], tags: d.style ? [...d.style] : [], notes: '',
+      effects: { distortion: 0, reverb: 0, delay: 0, filterLP: 100, bitcrush: 0, saturation: 0 },
+      generationSessionId: d.session,
+      variationIndex: i, parentSampleId: null,
+      modelVersion: 'Sonic v3.5',
+      createdAt: ts,
+      acceptedAt: d.status === 'accepted' ? ts + 1000 : null,
+      favoritedAt: d.fav ? ts + 2000 : null,
+      isFavorite: !!d.fav,
+      isInLibrary: d.status === 'accepted',
+      rejectionFeedback: d.feedback || null,
+      waveformData: generateWaveformData(60 + Math.floor(Math.random() * 40)),
+      projectId: 'proj_default',
+    };
+    if (!sessionMap[d.session]) sessionMap[d.session] = [];
+    sessionMap[d.session].push(id);
+    if (d.status === 'accepted' || d.status === 'rejected') {
+      decisions.push({ sampleId: id, action: d.status === 'accepted' ? 'accept' : 'reject', feedback: d.feedback, timestamp: ts });
+    }
+  });
+
+  // Create sessions
+  sessions[sessionId] = {
+    id: sessionId, type: 'loop',
+    params: { type: 'loop', bpm: 90, key: 'Cm', bars: 4, styles: ['Dusty', 'Lo-fi'], varCount: 6, model: 'Sonic v3.5' },
+    variationIds: sessionMap[sessionId] || [], acceptedCount: 2, rejectedCount: 1,
+    createdAt: Date.now() - 900000, projectId: 'proj_default',
+  };
+  sessions[sessionId2] = {
+    id: sessionId2, type: 'loop',
+    params: { type: 'loop', bpm: 120, key: 'C', bars: 2, styles: ['Crispy', 'Digital'], varCount: 4, model: 'Sonic v3.5' },
+    variationIds: sessionMap[sessionId2] || [], acceptedCount: 3, rejectedCount: 1,
+    createdAt: Date.now() - 600000, projectId: 'proj_default',
+  };
+  sessions[sessionId3] = {
+    id: sessionId3, type: 'oneshot',
+    params: { type: 'oneshot', tuning: 'C4', attack: 'Snappy', timbre: 'Warm', styles: ['Analog', 'Punchy'], varCount: 5, model: 'Sonic v3.5' },
+    variationIds: sessionMap[sessionId3] || [], acceptedCount: 3, rejectedCount: 0,
+    createdAt: Date.now() - 300000, projectId: 'proj_default',
+  };
+
+  saveData();
+}
+
+// ==================== INIT ====================
+loadData();
+seedDemoData();
+migrateToProjects();
+renderProjectSwitcher();
+navigateTo('dashboard');
 </script>
 </body>
 </html>
