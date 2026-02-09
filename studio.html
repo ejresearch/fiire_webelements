@@ -72,9 +72,8 @@ body { font-family: 'Space Grotesk', sans-serif; background: #000; color: #F9F9F
 /* Variation cards */
 .variation-card { transition: all 0.2s ease; }
 .variation-card:hover { border-color: #444; }
-.variation-card.accepted { border-color: rgba(16, 185, 129, 0.5); background: rgba(16, 185, 129, 0.03); }
-.variation-card.rejected { opacity: 0.4; border-color: rgba(239, 68, 68, 0.3); }
-.variation-card.rejected canvas { filter: grayscale(0.8); }
+.variation-card.kept { border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.03); }
+.variation-card.skipped canvas { filter: grayscale(0.8); }
 .variation-card.playing { border-color: #E85002; box-shadow: 0 0 0 1px #E85002, 0 0 16px rgba(232, 80, 2, 0.15); }
 
 /* Sample cards */
@@ -112,14 +111,6 @@ body { font-family: 'Space Grotesk', sans-serif; background: #000; color: #F9F9F
 .gen-loading-bar:nth-child(7) { animation-delay: 0.6s; }
 .gen-loading-bar:nth-child(8) { animation-delay: 0.7s; }
 
-/* History timeline */
-.history-item { position: relative; padding-left: 32px; }
-.history-item::before { content: ''; position: absolute; left: 11px; top: 32px; bottom: -16px; width: 2px; background: #333; }
-.history-item:last-child::before { display: none; }
-.history-dot { position: absolute; left: 4px; top: 8px; width: 16px; height: 16px; border-radius: 50%; border: 2px solid #333; background: #111; }
-.history-dot.loop { border-color: #E85002; }
-.history-dot.oneshot { border-color: #3B82F6; }
-
 /* BPM input */
 input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
 
@@ -140,7 +131,7 @@ input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
 
 <!-- ==================== SIDEBAR ==================== -->
 <aside class="w-64 flex-shrink-0 border-r border-border flex flex-col bg-panel z-10">
-  <div class="p-6 pb-3 flex items-center cursor-pointer" onclick="navigateTo('home')">
+  <div class="p-6 pb-3 flex items-center cursor-pointer" onclick="navigateTo('generate')">
     <img src="logo.png" alt="FIIRE" class="h-16 w-auto" />
   </div>
 
@@ -182,10 +173,6 @@ input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
   </div>
 
   <nav class="flex-1 px-4 py-2 flex flex-col gap-1">
-    <a class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer" data-page="home" onclick="navigateTo('home')">
-      <span class="material-symbols-outlined">home</span>
-      <span class="text-sm font-medium">Home</span>
-    </a>
     <a class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer" data-page="generate" onclick="navigateTo('generate')">
       <span class="material-symbols-outlined">music_note</span>
       <span class="text-sm font-medium">Studio</span>
@@ -198,22 +185,11 @@ input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
       <span class="material-symbols-outlined">fingerprint</span>
       <span class="text-sm font-medium">Sound DNA</span>
     </a>
-    <div class="mt-6 mb-3">
-      <p class="px-3 text-[10px] uppercase tracking-widest text-txt-dim font-bold">Collections</p>
-    </div>
-    <a class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer" data-page="favorites" onclick="navigateTo('favorites')">
-      <span class="material-symbols-outlined">favorite</span>
-      <span class="text-sm font-medium">Favorites</span>
-    </a>
-    <a class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer" data-page="history" onclick="navigateTo('history')">
-      <span class="material-symbols-outlined">history</span>
-      <span class="text-sm font-medium">Generation History</span>
-    </a>
   </nav>
   <div class="p-4 border-t border-border space-y-2">
     <button onclick="navigateTo('generate')" class="w-full flex items-center justify-center gap-2 py-3 bg-brand hover:bg-brand-hover text-txt rounded-xl font-bold text-sm shadow-lg shadow-brand/20 transition-all">
       <span class="material-symbols-outlined text-[18px]">add</span>
-      New Generation
+      New Session
     </button>
     <button onclick="openSettingsModal()" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-txt-muted hover:text-txt hover:bg-surface transition-colors">
       <span class="material-symbols-outlined text-[18px]">settings</span>
@@ -225,64 +201,17 @@ input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
 <!-- ==================== MAIN CONTENT ==================== -->
 <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
 
-<!-- ========== PAGE: HOME ========== -->
-<div id="page-home" class="page flex-col flex-1 overflow-hidden">
-  <main class="flex-1 overflow-y-auto">
-    <div class="max-w-3xl mx-auto px-8 py-12">
-
-      <!-- Greeting -->
-      <div class="mb-12">
-        <h1 id="home-greeting" class="text-3xl sm:text-4xl font-bold mb-2">Hello!</h1>
-        <p class="text-txt-muted text-lg">What are you working on today?</p>
-      </div>
-
-      <!-- Quick Actions -->
-      <div class="flex gap-4 mb-12">
-        <button onclick="navigateTo('generate'); setGenerateMode('loop')" class="flex-1 group bg-panel border border-border rounded-2xl p-6 text-left hover:border-brand transition-colors">
-          <div class="w-10 h-10 rounded-xl bg-brand/15 flex items-center justify-center mb-4">
-            <span class="material-symbols-outlined text-brand">loop</span>
-          </div>
-          <p class="font-bold text-txt mb-1">Generate Loop</p>
-          <p class="text-sm text-txt-muted">Create AI-powered drum loops and patterns</p>
-        </button>
-        <button onclick="navigateTo('generate'); setGenerateMode('oneshot')" class="flex-1 group bg-panel border border-border rounded-2xl p-6 text-left hover:border-brand transition-colors">
-          <div class="w-10 h-10 rounded-xl bg-brand/15 flex items-center justify-center mb-4">
-            <span class="material-symbols-outlined text-brand">radio_button_checked</span>
-          </div>
-          <p class="font-bold text-txt mb-1">Generate One-Shot</p>
-          <p class="text-sm text-txt-muted">Create single hits, stabs, and percussion</p>
-        </button>
-        <button onclick="navigateTo('sounddna')" class="flex-1 group bg-panel border border-border rounded-2xl p-6 text-left hover:border-brand transition-colors">
-          <div class="w-10 h-10 rounded-xl bg-brand/15 flex items-center justify-center mb-4">
-            <span class="material-symbols-outlined text-brand">fingerprint</span>
-          </div>
-          <p class="font-bold text-txt mb-1">Sound DNA</p>
-          <p class="text-sm text-txt-muted">Analyze your sound and get a custom sample pack</p>
-        </button>
-      </div>
-
-      <!-- Projects -->
-      <div>
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-xl font-bold">Your Projects</h2>
-          <button onclick="startNewProject()" class="text-sm text-brand hover:text-brand-hover font-medium flex items-center gap-1 transition-colors">
-            <span class="material-symbols-outlined text-[16px]">add</span> New Project
-          </button>
-        </div>
-        <div id="home-projects" class="space-y-2">
-          <!-- rendered by JS -->
-        </div>
-      </div>
-
-    </div>
-  </main>
-</div>
-
 <!-- ========== PAGE: STUDIO ========== -->
 <div id="page-generate" class="page flex-col flex-1 overflow-hidden">
 
   <!-- ===== TOP: Prompt-first Generation Bar ===== -->
   <div class="bg-panel border-b border-border flex-shrink-0 px-8 py-6">
+    <!-- API key warning -->
+    <div id="api-key-warning" class="hidden flex items-center gap-2 mb-4 px-4 py-2.5 bg-amber-500/10 border border-amber-500/20 rounded-lg text-sm">
+      <span class="material-symbols-outlined text-amber-400 text-[18px]">warning</span>
+      <span class="text-amber-300">No API key set — samples will be synthetic placeholders.</span>
+      <button class="text-amber-400 hover:text-amber-300 underline ml-1 font-medium" onclick="openSettingsModal()">Add key</button>
+    </div>
     <!-- Hero prompt row -->
     <div class="flex items-center gap-3">
       <!-- Upload reference button -->
@@ -434,11 +363,20 @@ input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
       <div class="flex-1 overflow-y-auto px-6 pb-28">
         <div id="var-grid"></div>
 
+        <!-- Summary bar -->
+        <div id="gen-summary" class="hidden flex items-center justify-between mt-4 pt-4 border-t border-border"></div>
+
         <!-- Empty state -->
         <div id="gen-empty" class="flex flex-col items-center justify-center py-24">
           <span class="material-symbols-outlined text-6xl text-brand/30 mb-4">bolt</span>
-          <p class="text-txt-muted font-medium text-lg">Ready when you are</p>
-          <p class="text-txt-dim text-sm mt-1">Pick your vibe above and hit Generate</p>
+          <p class="text-txt-muted font-medium text-lg">Describe your sound above</p>
+          <p class="text-txt-dim text-sm mt-1">and hit Generate to get started</p>
+          <div class="mt-8 flex flex-col gap-2 w-full max-w-md">
+            <p class="text-txt-dim text-xs text-center mb-1">or try one of these</p>
+            <button class="starter-prompt text-left px-4 py-3 bg-surface border border-border rounded-xl text-sm text-txt-muted hover:border-brand hover:text-txt transition-colors" onclick="useStarterPrompt(this)">Dusty lo-fi drum loop, 90 BPM</button>
+            <button class="starter-prompt text-left px-4 py-3 bg-surface border border-border rounded-xl text-sm text-txt-muted hover:border-brand hover:text-txt transition-colors" onclick="useStarterPrompt(this)">Crispy digital hi-hats, 128 BPM</button>
+            <button class="starter-prompt text-left px-4 py-3 bg-surface border border-border rounded-xl text-sm text-txt-muted hover:border-brand hover:text-txt transition-colors" onclick="useStarterPrompt(this)">Warm analog kick with punchy attack</button>
+          </div>
         </div>
 
       </div>
@@ -478,15 +416,6 @@ input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
           <button class="bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs hover:bg-dk-gray transition-colors" onclick="toggleSampleFavorite(state.inspectedSample)">
             <span class="material-symbols-outlined text-[16px]" id="inspector-fav-icon">favorite</span>
           </button>
-          <button class="ml-auto bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs hover:bg-dk-gray transition-colors" onclick="batchFromSample()">
-            <span class="material-symbols-outlined text-[16px]">auto_awesome</span>
-          </button>
-        </div>
-
-        <!-- Tags -->
-        <div>
-          <h4 class="text-[10px] font-semibold text-txt-muted uppercase tracking-wider mb-1.5">Tags</h4>
-          <div id="inspector-tags" class="flex flex-wrap gap-1"></div>
         </div>
 
         <!-- Notes -->
@@ -504,7 +433,7 @@ input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
   <header class="flex flex-wrap items-center justify-between gap-4 px-8 pt-6 pb-4">
     <div>
       <h2 class="text-3xl font-black tracking-tight">Sample Library</h2>
-      <p class="text-txt-muted text-sm">Your accepted samples and loops.</p>
+      <p class="text-txt-muted text-sm">Your kept samples and loops.</p>
     </div>
     <div class="flex items-center gap-3">
       <button class="flex items-center gap-2 bg-surface text-txt px-4 py-2 rounded-lg text-sm font-bold border border-border hover:bg-dk-gray transition-colors" onclick="openImportModal()">
@@ -521,10 +450,11 @@ input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
       <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-txt-dim text-[20px]">search</span>
       <input id="lib-search" class="w-full bg-surface border border-border rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-brand/50 focus:border-brand text-txt placeholder-txt-dim" placeholder="Search library..." type="text" oninput="renderLibrary()"/>
     </div>
-    <div class="flex gap-2">
+    <div class="flex gap-2" id="lib-type-chips">
       <button class="param-chip active text-[11px]" onclick="setLibType('all', this)">All</button>
       <button class="param-chip text-[11px]" onclick="setLibType('loop', this)">Loops</button>
       <button class="param-chip text-[11px]" onclick="setLibType('oneshot', this)">One-Shots</button>
+      <button class="param-chip text-[11px]" onclick="setLibType('favorites', this)">Favorites</button>
     </div>
     <select id="lib-key-filter" class="bg-surface border border-border rounded-lg px-3 py-2 text-sm text-txt" onchange="renderLibrary()">
       <option value="all">All Keys</option>
@@ -579,67 +509,6 @@ input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
       <button class="flex items-center gap-2 text-red-400 px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-500/10 transition-colors" onclick="deleteSelected()">
         <span class="material-symbols-outlined text-[18px]">delete</span> Delete
       </button>
-    </div>
-  </div>
-</div>
-
-<!-- ========== PAGE: FAVORITES ========== -->
-<div id="page-favorites" class="page flex-col flex-1 overflow-hidden">
-  <header class="flex flex-wrap items-center justify-between gap-4 px-8 pt-6 pb-4">
-    <div class="flex items-center gap-3">
-      <span class="material-symbols-outlined text-brand text-3xl fill-1">favorite</span>
-      <div>
-        <h2 class="text-3xl font-black tracking-tight">Favorites</h2>
-        <p class="text-txt-muted text-sm"><span id="fav-count">0</span> favorited samples</p>
-      </div>
-    </div>
-  </header>
-  <div class="px-8 pb-4 flex flex-wrap items-center gap-3">
-    <div class="relative flex-1 max-w-xs">
-      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-txt-dim text-[20px]">search</span>
-      <input id="fav-search" class="w-full bg-surface border border-border rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-brand/50 focus:border-brand text-txt placeholder-txt-dim" placeholder="Search favorites..." type="text" oninput="renderFavorites()"/>
-    </div>
-    <select id="fav-sort" class="bg-surface border border-border rounded-lg px-3 py-2 text-sm text-txt" onchange="renderFavorites()">
-      <option value="fav-recent">Recently Favorited</option>
-      <option value="recent">Newest Created</option>
-      <option value="name">Name A-Z</option>
-      <option value="bpm">BPM</option>
-    </select>
-  </div>
-  <div class="flex-1 overflow-auto px-8 pb-28">
-    <div id="fav-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"></div>
-    <div id="fav-empty" class="hidden text-center py-16 border-2 border-dashed border-border rounded-2xl">
-      <span class="material-symbols-outlined text-4xl text-txt-dim mb-3 block fill-1">favorite</span>
-      <p class="text-txt-muted font-medium">No favorites yet</p>
-      <p class="text-txt-dim text-sm">Click the heart icon on any sample to add it here.</p>
-    </div>
-  </div>
-</div>
-
-<!-- ========== PAGE: HISTORY ========== -->
-<div id="page-history" class="page flex-col flex-1 overflow-hidden">
-  <header class="px-8 pt-6 pb-4">
-    <h2 class="text-3xl font-black tracking-tight">Generation History</h2>
-    <p class="text-txt-muted text-sm">Review your previous generation sessions.</p>
-  </header>
-  <div class="px-8 pb-4 flex items-center gap-3">
-    <div class="relative flex-1 max-w-xs">
-      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-txt-dim text-[20px]">search</span>
-      <input id="hist-search" class="w-full bg-surface border border-border rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-brand/50 focus:border-brand text-txt placeholder-txt-dim" placeholder="Search history..." type="text" oninput="renderHistory()"/>
-    </div>
-    <select id="hist-type-filter" class="bg-surface border border-border rounded-lg px-3 py-2 text-sm text-txt" onchange="renderHistory()">
-      <option value="all">All Types</option>
-      <option value="loop">Loops</option>
-      <option value="oneshot">One-Shots</option>
-      <option value="dna-pack">DNA Packs</option>
-    </select>
-  </div>
-  <div class="flex-1 overflow-auto px-8 pb-28">
-    <div id="hist-timeline" class="space-y-4"></div>
-    <div id="hist-empty" class="hidden text-center py-16 border-2 border-dashed border-border rounded-2xl">
-      <span class="material-symbols-outlined text-4xl text-txt-dim mb-3 block">history</span>
-      <p class="text-txt-muted font-medium">No generation history yet</p>
-      <p class="text-txt-dim text-sm">Your generation sessions will appear here.</p>
     </div>
   </div>
 </div>
@@ -831,20 +700,6 @@ input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
 
 <div id="toast" class="toast"></div>
 
-<!-- Reject feedback modal -->
-<div id="reject-modal" class="modal-overlay" onclick="if(event.target===this)closeModal()">
-  <div class="bg-panel border border-border rounded-2xl p-6 w-full max-w-sm animate-fadeIn">
-    <h3 class="text-lg font-bold mb-3">Why reject this sample?</h3>
-    <div class="space-y-2 mb-4">
-      <button class="w-full text-left px-4 py-2.5 bg-surface border border-border rounded-lg text-sm hover:bg-dk-gray transition-colors" onclick="submitReject('too_muddy')">Too muddy</button>
-      <button class="w-full text-left px-4 py-2.5 bg-surface border border-border rounded-lg text-sm hover:bg-dk-gray transition-colors" onclick="submitReject('wrong_feel')">Wrong feel</button>
-      <button class="w-full text-left px-4 py-2.5 bg-surface border border-border rounded-lg text-sm hover:bg-dk-gray transition-colors" onclick="submitReject('too_busy')">Too busy</button>
-      <button class="w-full text-left px-4 py-2.5 bg-surface border border-border rounded-lg text-sm hover:bg-dk-gray transition-colors" onclick="submitReject('low_quality')">Low quality</button>
-    </div>
-    <button class="text-txt-dim text-sm hover:text-txt" onclick="submitReject('skip')">Skip feedback</button>
-  </div>
-</div>
-
 <!-- Confirm modal -->
 <div id="confirm-modal" class="modal-overlay" onclick="if(event.target===this)closeModal()">
   <div class="bg-panel border border-border rounded-2xl p-6 w-full max-w-sm animate-fadeIn">
@@ -932,7 +787,7 @@ let ELEVENLABS_API_KEY = localStorage.getItem('fiire_api_key') || '';
 
 // ==================== STATE ====================
 const state = {
-  currentPage: 'dashboard',
+  currentPage: 'generate',
   generateMode: 'loop',
   isPlaying: false,
   currentSample: null,
@@ -947,8 +802,6 @@ const state = {
   selectedSamples: new Set(),
   libraryView: 'grid',
   libraryType: 'all',
-  rejectingSampleId: null,
-  confirmCallback: null,
   selectedBars: 4,
 };
 
@@ -1064,7 +917,7 @@ function deleteAudioBlobsForProject(projectId) {
 function uid(prefix) { return prefix + '_' + (++varIdCounter) + '_' + Date.now().toString(36); }
 function formatTime(s) { const m = Math.floor(s/60); const sec = Math.floor(s%60); return m+':'+(sec<10?'0':'')+sec; }
 function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2000); }
-function closeModal() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open')); state.rejectingSampleId = null; }
+function closeModal() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open')); }
 
 // ==================== AUDIO ENGINE ====================
 let audioCtx = null;
@@ -1420,63 +1273,14 @@ function navigateTo(page) {
     link.classList.remove('active'); link.classList.add('text-txt-muted');
     if (link.dataset.page === page) { link.classList.add('active'); link.classList.remove('text-txt-muted'); }
   });
-  if (page === 'home') renderHome();
-  if (page === 'generate') renderVariations();
+  if (page === 'generate') {
+    const warn = document.getElementById('api-key-warning');
+    if (warn) warn.classList.toggle('hidden', !!(ELEVENLABS_API_KEY && ELEVENLABS_API_KEY.length > 0));
+    renderVariations();
+  }
   if (page === 'library') renderLibrary();
-  if (page === 'favorites') renderFavorites();
-  if (page === 'history') renderHistory();
   if (page === 'sounddna') renderSoundDna();
   renderProjectSwitcher();
-}
-
-// ==================== HOME PAGE ====================
-function renderHome() {
-  // Greeting based on time of day
-  const hour = new Date().getHours();
-  const timeGreeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-  document.getElementById('home-greeting').textContent = `${timeGreeting}!`;
-
-  // Render project cards
-  const container = document.getElementById('home-projects');
-  const projList = Object.values(projects).sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
-
-  if (!projList.length) {
-    container.innerHTML = `
-      <div class="text-center py-12 border-2 border-dashed border-border rounded-2xl">
-        <span class="material-symbols-outlined text-4xl text-txt-dim mb-3 block">folder_open</span>
-        <p class="text-txt-muted font-medium">No projects yet</p>
-        <p class="text-txt-dim text-sm mt-1">Create your first project to get started.</p>
-      </div>`;
-    return;
-  }
-
-  container.innerHTML = projList.map(p => {
-    const sampleCount = Object.values(samples).filter(s => s.projectId === p.id).length;
-    const acceptedCount = Object.values(samples).filter(s => s.projectId === p.id && s.isInLibrary).length;
-    const sessionCount = Object.values(sessions).filter(s => s.projectId === p.id).length;
-    const isActive = p.id === currentProjectId;
-    return `
-      <div class="group flex items-center gap-4 bg-panel border ${isActive ? 'border-brand/40' : 'border-border'} rounded-xl p-4 cursor-pointer hover:border-brand transition-colors"
-           onclick="switchProject('${p.id}'); navigateTo('generate');">
-        <div class="w-10 h-10 rounded-lg ${isActive ? 'bg-brand/20' : 'bg-surface'} flex items-center justify-center flex-shrink-0">
-          <span class="material-symbols-outlined ${isActive ? 'text-brand' : 'text-txt-muted'}">folder</span>
-        </div>
-        <div class="flex-1 min-w-0">
-          <p class="font-bold text-sm truncate">${p.name}</p>
-          <p class="text-xs text-txt-muted">${sampleCount} samples &middot; ${acceptedCount} accepted &middot; ${sessionCount} sessions</p>
-        </div>
-        ${isActive ? '<span class="text-[10px] text-brand font-bold uppercase tracking-wider">Active</span>' : ''}
-        <span class="material-symbols-outlined text-txt-dim text-[18px] group-hover:text-txt transition-colors">arrow_forward</span>
-      </div>`;
-  }).join('');
-}
-
-function startNewProject() {
-  const name = prompt('Project name:');
-  if (name && name.trim()) {
-    createProject(name.trim());
-    renderHome();
-  }
 }
 
 // ==================== WAVEFORM RENDERING ====================
@@ -1607,11 +1411,6 @@ function setGenerateMode(mode) {
     osEl.style.display = 'flex';
   }
   document.querySelectorAll('input[name="gen-mode"]').forEach(r => { r.checked = r.value === mode; });
-  updateGenBtnText();
-}
-
-function updateGenBtnText() {
-  document.getElementById('gen-btn-text').textContent = 'Generate';
 }
 
 function setLength(bars, el) {
@@ -1687,6 +1486,8 @@ function calcDuration(params) {
 }
 
 function callElevenLabsSfx(prompt, duration, isLoop, modelId) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
   return fetch('https://api.elevenlabs.io/v1/sound-generation?output_format=pcm_44100', {
     method: 'POST',
     headers: {
@@ -1700,9 +1501,14 @@ function callElevenLabsSfx(prompt, duration, isLoop, modelId) {
       loop: isLoop,
       model_id: modelId || 'eleven_text_to_sound_v2',
     }),
+    signal: controller.signal,
   }).then(res => {
+    clearTimeout(timeoutId);
     if (!res.ok) return res.text().then(t => { throw new Error(`API ${res.status}: ${t}`); });
     return res.arrayBuffer();
+  }).catch(err => {
+    clearTimeout(timeoutId);
+    throw err.name === 'AbortError' ? new Error('Request timed out (30s)') : err;
   });
 }
 
@@ -1718,9 +1524,29 @@ function pcmToAudioBuffer(pcmData, sampleRate) {
   return buf;
 }
 
+function setGeneratingUI(active) {
+  const btn = document.getElementById('gen-btn');
+  const btnText = document.getElementById('gen-btn-text');
+  const btnIcon = btn.querySelector('.material-symbols-outlined');
+  if (active) {
+    btn.disabled = true;
+    btn.classList.add('opacity-60', 'cursor-not-allowed');
+    btnText.textContent = 'Generating...';
+    btnIcon.textContent = 'progress_activity';
+    btnIcon.classList.add('animate-spin');
+  } else {
+    btn.disabled = false;
+    btn.classList.remove('opacity-60', 'cursor-not-allowed');
+    btnText.textContent = 'Generate';
+    btnIcon.textContent = 'bolt';
+    btnIcon.classList.remove('animate-spin');
+  }
+}
+
 function generateSamples() {
   if (state.generating) return;
   state.generating = true;
+  setGeneratingUI(true);
   const params = getGenParams();
   const useAPI = ELEVENLABS_API_KEY && ELEVENLABS_API_KEY.length > 0;
 
@@ -1781,9 +1607,10 @@ function generateSamples() {
   if (!useAPI) {
     // No API key — fall back to synthetic audio
     state.generating = false;
+    setGeneratingUI(false);
     renderVariations();
     document.getElementById('gen-loading').classList.add('hidden');
-      document.getElementById('gen-var-count').textContent = variationIds.length + ' variations';
+    document.getElementById('gen-var-count').textContent = variationIds.length + ' variations';
     showToast('No API key — generated synthetic placeholders');
     ensureAudioContext();
     variationIds.forEach(vid => getAudioBuffer(vid));
@@ -1816,9 +1643,10 @@ function generateSamples() {
           completed++;
           if (completed === variationIds.length) {
             state.generating = false;
+            setGeneratingUI(false);
             renderVariations();
             document.getElementById('gen-loading').classList.add('hidden');
-                      document.getElementById('gen-var-count').textContent = variationIds.length + ' variations';
+            document.getElementById('gen-var-count').textContent = variationIds.length + ' variations';
             if (failed > 0) {
               showToast(`Generated ${completed - failed} samples (${failed} fell back to synthetic)`);
             } else {
@@ -1838,113 +1666,127 @@ function renderVariations() {
   if (!list.length) {
     container.innerHTML = '';
     emptyEl.classList.remove('hidden');
+    document.getElementById('gen-summary').classList.add('hidden');
     return;
   }
   emptyEl.classList.add('hidden');
   document.getElementById('gen-var-count').textContent = list.length + ' variation' + (list.length !== 1 ? 's' : '');
 
-  container.className = 'space-y-1.5';
+  container.className = 'space-y-3';
   container.innerHTML = list.map(s => renderStackRow(s)).join('');
+
+  // Summary bar
+  const kept = list.filter(s => s.status === 'accepted');
+  const total = list.length;
+  const summaryEl = document.getElementById('gen-summary');
+  if (kept.length > 0 || list.some(s => s.status === 'rejected')) {
+    const lastName = kept.length > 0 ? kept[kept.length - 1].name : '';
+    summaryEl.classList.remove('hidden');
+    summaryEl.innerHTML = `
+      <span class="text-sm text-txt-muted">Kept <strong class="text-txt">${kept.length}</strong> of ${total}</span>
+      ${kept.length > 0 ? `<button class="flex items-center gap-1.5 text-sm text-brand hover:text-brand-hover font-medium transition-colors" onclick="generateMoreLike('${kept[kept.length - 1].id}')">
+        <span class="material-symbols-outlined text-[16px]">refresh</span> Generate more like "${lastName}"
+      </button>` : ''}`;
+  } else {
+    summaryEl.classList.add('hidden');
+  }
 
   requestAnimationFrame(() => {
     document.querySelectorAll('.var-waveform').forEach(canvas => {
       const id = canvas.dataset.id;
       const s = samples[id];
-      if (s) drawWaveform(canvas, s.waveformData, s.status === 'rejected' ? '#444' : '#E85002');
+      if (s) drawWaveform(canvas, s.waveformData, s.status === 'rejected' ? '#333' : '#E85002');
     });
   });
 }
 
-function renderGridCard(s) {
-  const id = s.id;
-  const statusClass = s.status === 'accepted' ? 'accepted' : s.status === 'rejected' ? 'rejected' : '';
-  const playingClass = state.currentSample === id ? 'playing' : '';
-  const meta = s.type === 'loop' ? `${s.bpm} BPM / ${s.key} / ${s.bars} bars` : `${s.tuning} / ${s.attack} / ${s.timbre}`;
-  const typeBadge = s.type === 'loop' ? 'badge-loop' : 'badge-oneshot';
-  return `
-    <div class="variation-card ${statusClass} ${playingClass} relative bg-surface rounded-xl border border-border overflow-hidden"
-         data-id="${id}">
-      <div class="relative h-24 bg-bg p-2 cursor-pointer" onclick="previewSample('${id}')">
-        <canvas class="var-waveform w-full h-full" data-id="${id}"></canvas>
-        <div class="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-          <div class="w-9 h-9 bg-brand/90 rounded-full flex items-center justify-center">
-            <span class="material-symbols-outlined text-[22px] fill-1 text-txt">${state.currentSample === id && state.isPlaying ? 'pause' : 'play_arrow'}</span>
-          </div>
-        </div>
-        <span class="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 bg-black/75 text-[9px] font-mono text-txt rounded">${formatTime(s.duration)}</span>
-        <span class="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${typeBadge}">${s.type}</span>
-        ${s.status === 'accepted' ? '<span class="absolute top-1.5 right-1.5 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center"><span class="material-symbols-outlined text-[12px] text-txt">check</span></span>' : ''}
-      </div>
-      <div class="p-2.5">
-        <p class="text-[11px] font-bold truncate mb-0.5">${s.name}</p>
-        <p class="text-[10px] text-txt-dim truncate mb-2">${meta}</p>
-        ${s.status === 'pending' ? `
-        <div class="flex items-center gap-1">
-          <button class="flex-1 flex items-center justify-center gap-0.5 py-1 bg-emerald-500/15 text-emerald-400 rounded-md text-[10px] font-bold hover:bg-emerald-500/25 transition-colors" onclick="event.stopPropagation(); acceptVariation('${id}')">
-            <span class="material-symbols-outlined text-[14px]">check</span> Accept
-          </button>
-          <button class="flex-1 flex items-center justify-center gap-0.5 py-1 bg-red-500/10 text-red-400 rounded-md text-[10px] font-bold hover:bg-red-500/20 transition-colors" onclick="event.stopPropagation(); rejectVariation('${id}')">
-            <span class="material-symbols-outlined text-[14px]">close</span> Reject
-          </button>
-          <button class="p-1 text-txt-muted hover:text-brand rounded-md hover:bg-bg transition-colors" onclick="event.stopPropagation(); toggleSampleFavorite('${id}')">
-            <span class="material-symbols-outlined text-[14px] ${s.isFavorite ? 'fill-1 text-brand' : ''}">favorite</span>
-          </button>
-        </div>` : s.status === 'accepted' ? `
-        <div class="flex items-center justify-between">
-          <span class="text-[10px] text-emerald-400 font-bold">Accepted</span>
-          <button class="p-1 text-txt-muted hover:text-brand rounded-md" onclick="event.stopPropagation(); toggleSampleFavorite('${id}')">
-            <span class="material-symbols-outlined text-[14px] ${s.isFavorite ? 'fill-1 text-brand' : ''}">favorite</span>
-          </button>
-        </div>` : `
-        <div class="text-[10px] text-red-400 font-bold">${s.rejectionFeedback && s.rejectionFeedback !== 'skip' ? 'Rejected: ' + s.rejectionFeedback.replace('_', ' ') : 'Rejected'}</div>`}
-      </div>
-    </div>`;
-}
-
 function renderStackRow(s) {
   const id = s.id;
-  const statusClass = s.status === 'accepted' ? 'accepted' : s.status === 'rejected' ? 'rejected' : '';
-  const playingClass = state.currentSample === id ? 'playing' : '';
-  const meta = s.type === 'loop' ? `${s.bpm} BPM / ${s.key} / ${s.bars} bars` : `${s.tuning} / ${s.attack} / ${s.timbre}`;
+  const isPlaying = state.currentSample === id && state.isPlaying;
+  const meta = s.type === 'loop' ? `${s.bpm} BPM · ${s.key} · ${s.bars} bars` : `${s.tuning} · ${s.attack} · ${s.timbre}`;
   const typeBadge = s.type === 'loop' ? 'badge-loop' : 'badge-oneshot';
-  const favClass = s.isFavorite ? 'fill-1 text-brand' : '';
-  return `
-    <div class="variation-card ${statusClass} ${playingClass} bg-surface rounded-lg border border-border flex items-center gap-3 pr-3 group cursor-pointer"
-         data-id="${id}" onclick="previewSample('${id}')">
-      <div class="relative w-28 h-14 flex-shrink-0 bg-bg rounded-l-lg overflow-hidden">
-        <canvas class="var-waveform w-full h-full" data-id="${id}"></canvas>
-        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-          <div class="w-7 h-7 bg-brand/90 rounded-full flex items-center justify-center">
-            <span class="material-symbols-outlined text-[16px] fill-1 text-txt">${state.currentSample === id && state.isPlaying ? 'pause' : 'play_arrow'}</span>
-          </div>
+
+  if (s.status === 'rejected') {
+    // Skipped — dimmed card with undo
+    return `
+    <div class="variation-card skipped bg-surface/40 rounded-xl border border-border/50 p-4 opacity-40 hover:opacity-60 transition-opacity" data-id="${id}">
+      <div class="flex items-center gap-3">
+        <button class="w-9 h-9 rounded-lg bg-bg/50 flex items-center justify-center flex-shrink-0" onclick="previewSample('${id}')">
+          <span class="material-symbols-outlined text-[18px] text-txt-dim">${isPlaying ? 'pause' : 'play_arrow'}</span>
+        </button>
+        <canvas class="var-waveform flex-1 h-10" data-id="${id}"></canvas>
+        <div class="flex items-center gap-3 flex-shrink-0">
+          <span class="text-xs text-txt-dim">${s.name}</span>
+          <span class="text-[10px] font-mono text-txt-dim">${formatTime(s.duration)}</span>
+          <button class="text-xs text-txt-muted hover:text-txt underline transition-colors" onclick="undoSkip('${id}')">Undo</button>
         </div>
-        <span class="absolute top-1 left-1 px-1 py-0.5 rounded text-[8px] font-bold uppercase ${typeBadge}">${s.type}</span>
       </div>
-      <div class="flex-1 min-w-0 py-2">
-        <p class="text-xs font-bold truncate">${s.name}</p>
-        <p class="text-[10px] text-txt-dim truncate">${meta}</p>
+    </div>`;
+  }
+
+  if (s.status === 'accepted') {
+    // Kept — green accent, post-decision actions
+    return `
+    <div class="variation-card kept ${isPlaying ? 'playing' : ''} bg-surface rounded-xl border border-emerald-500/30 border-l-2 border-l-emerald-500 p-4" data-id="${id}">
+      <div class="flex items-center gap-3 mb-3">
+        <button class="w-10 h-10 rounded-lg bg-bg flex items-center justify-center flex-shrink-0 hover:bg-dk-gray transition-colors" onclick="previewSample('${id}')">
+          <span class="material-symbols-outlined text-[20px] fill-1 ${isPlaying ? 'text-brand' : 'text-txt'}">${isPlaying ? 'pause' : 'play_arrow'}</span>
+        </button>
+        <canvas class="var-waveform flex-1 h-12" data-id="${id}"></canvas>
+        <div class="text-right flex-shrink-0">
+          <p class="text-xs font-bold">${s.name}</p>
+          <p class="text-[10px] text-txt-dim">${meta}</p>
+        </div>
+        <span class="text-[10px] font-mono text-txt-dim flex-shrink-0">${formatTime(s.duration)}</span>
+        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${typeBadge} flex-shrink-0">${s.type}</span>
       </div>
-      <span class="text-[10px] font-mono text-txt-dim flex-shrink-0">${formatTime(s.duration)}</span>
-      ${s.status === 'accepted' ? `
-      <span class="text-[10px] text-emerald-400 font-bold flex-shrink-0 w-16 text-center">Accepted</span>` : s.status === 'rejected' ? `
-      <span class="text-[10px] text-red-400 font-bold flex-shrink-0 w-16 text-center">Rejected</span>` : `
-      <div class="flex items-center gap-1 flex-shrink-0">
-        <button class="flex items-center gap-0.5 px-2 py-1 bg-emerald-500/15 text-emerald-400 rounded-md text-[10px] font-bold hover:bg-emerald-500/25 transition-colors" onclick="event.stopPropagation(); acceptVariation('${id}')">
-          <span class="material-symbols-outlined text-[12px]">check</span> Accept
+      <div class="flex items-center gap-2 ml-[52px]">
+        <span class="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
+          <span class="material-symbols-outlined text-[14px]">check_circle</span> In library
+        </span>
+        <div class="flex items-center gap-1 ml-auto">
+          <button class="flex items-center gap-1 px-2.5 py-1 bg-surface border border-border rounded-lg text-[11px] text-txt-muted hover:text-txt hover:bg-dk-gray transition-colors" onclick="event.stopPropagation(); toggleSampleFavorite('${id}')">
+            <span class="material-symbols-outlined text-[14px] ${s.isFavorite ? 'fill-1 text-brand' : ''}">${s.isFavorite ? 'favorite' : 'favorite_border'}</span>
+          </button>
+          <button class="flex items-center gap-1 px-2.5 py-1 bg-surface border border-border rounded-lg text-[11px] text-txt-muted hover:text-txt hover:bg-dk-gray transition-colors" onclick="event.stopPropagation(); downloadSample('${id}')">
+            <span class="material-symbols-outlined text-[14px]">download</span>
+          </button>
+          <button class="flex items-center gap-1 px-2.5 py-1 bg-surface border border-border rounded-lg text-[11px] text-txt-muted hover:text-txt hover:bg-dk-gray transition-colors" onclick="event.stopPropagation(); openInspector('${id}')">
+            <span class="material-symbols-outlined text-[14px]">info</span>
+          </button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // Pending — primary card with Keep/Skip
+  return `
+    <div class="variation-card ${isPlaying ? 'playing' : ''} bg-surface rounded-xl border border-border p-4" data-id="${id}">
+      <div class="flex items-center gap-3 mb-3">
+        <button class="w-10 h-10 rounded-lg bg-bg flex items-center justify-center flex-shrink-0 hover:bg-dk-gray transition-colors" onclick="previewSample('${id}')">
+          <span class="material-symbols-outlined text-[20px] fill-1 ${isPlaying ? 'text-brand' : 'text-txt'}">${isPlaying ? 'pause' : 'play_arrow'}</span>
         </button>
-        <button class="flex items-center gap-0.5 px-2 py-1 bg-red-500/10 text-red-400 rounded-md text-[10px] font-bold hover:bg-red-500/20 transition-colors" onclick="event.stopPropagation(); rejectVariation('${id}')">
-          <span class="material-symbols-outlined text-[12px]">close</span> Reject
+        <canvas class="var-waveform flex-1 h-12" data-id="${id}"></canvas>
+        <div class="text-right flex-shrink-0">
+          <p class="text-xs font-bold">${s.name}</p>
+          <p class="text-[10px] text-txt-dim">${meta}</p>
+        </div>
+        <span class="text-[10px] font-mono text-txt-dim flex-shrink-0">${formatTime(s.duration)}</span>
+        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${typeBadge} flex-shrink-0">${s.type}</span>
+      </div>
+      <div class="flex items-center gap-2 ml-[52px]">
+        <button class="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-500/15 text-emerald-400 rounded-lg text-xs font-bold hover:bg-emerald-500/25 transition-colors" onclick="event.stopPropagation(); keepVariation('${id}')">
+          <span class="material-symbols-outlined text-[16px]">check</span> Keep
         </button>
-      </div>`}
-      <button class="p-1.5 text-txt-muted hover:text-brand rounded-md flex-shrink-0 transition-colors" onclick="event.stopPropagation(); toggleSampleFavorite('${id}')">
-        <span class="material-symbols-outlined text-[16px] ${favClass}">favorite</span>
-      </button>
-      ${s.status === 'accepted' ? '<span class="material-symbols-outlined text-[14px] text-emerald-500 flex-shrink-0">check_circle</span>' : ''}
+        <button class="flex items-center gap-1.5 px-4 py-1.5 text-txt-dim rounded-lg text-xs font-medium hover:bg-bg hover:text-txt-muted transition-colors" onclick="event.stopPropagation(); skipVariation('${id}')">
+          Skip
+        </button>
+      </div>
     </div>`;
 }
 
-// ==================== ACCEPT / REJECT ====================
-function acceptVariation(id) {
+// ==================== KEEP / SKIP ====================
+function keepVariation(id) {
   const s = samples[id];
   if (!s || s.status !== 'pending') return;
   s.status = 'accepted';
@@ -1952,32 +1794,47 @@ function acceptVariation(id) {
   s.isInLibrary = true;
   const session = sessions[s.generationSessionId];
   if (session) session.acceptedCount++;
-  decisions.push({ sampleId: id, action: 'accept', timestamp: Date.now() });
+  decisions.push({ sampleId: id, action: 'keep', timestamp: Date.now() });
   saveData();
   renderVariations();
-  showToast('Sample accepted & added to library!');
+  showToast('Kept — added to library');
 }
 
-function rejectVariation(id) {
-  state.rejectingSampleId = id;
-  document.getElementById('reject-modal').classList.add('open');
-}
-
-function submitReject(feedback) {
-  const id = state.rejectingSampleId;
-  if (!id) return;
+function skipVariation(id) {
   const s = samples[id];
-  if (s) {
-    s.status = 'rejected';
-    s.rejectionFeedback = feedback;
-    const session = sessions[s.generationSessionId];
-    if (session) session.rejectedCount++;
-    decisions.push({ sampleId: id, action: 'reject', feedback, timestamp: Date.now() });
-  }
-  closeModal();
+  if (!s || s.status !== 'pending') return;
+  s.status = 'rejected';
+  const session = sessions[s.generationSessionId];
+  if (session) session.rejectedCount++;
+  decisions.push({ sampleId: id, action: 'skip', timestamp: Date.now() });
   saveData();
   renderVariations();
-  showToast('Sample rejected' + (feedback !== 'skip' ? ' — feedback recorded' : ''));
+}
+
+function undoSkip(id) {
+  const s = samples[id];
+  if (!s || s.status !== 'rejected') return;
+  s.status = 'pending';
+  const session = sessions[s.generationSessionId];
+  if (session && session.rejectedCount > 0) session.rejectedCount--;
+  decisions.push({ sampleId: id, action: 'unskip', timestamp: Date.now() });
+  saveData();
+  renderVariations();
+}
+
+function useStarterPrompt(el) {
+  document.getElementById('gen-prompt').value = el.textContent;
+  generateSamples();
+}
+
+function generateMoreLike(id) {
+  const s = samples[id];
+  if (!s) return;
+  const prompt = document.getElementById('gen-prompt');
+  const meta = s.type === 'loop' ? `${s.bpm} BPM ${s.key} ${s.bars} bars` : `${s.tuning} ${s.attack} ${s.timbre}`;
+  const styles = s.style && s.style.length ? s.style.join(' ') : '';
+  prompt.value = `More like "${s.name}" — ${styles} ${s.type}, ${meta}`.trim();
+  generateSamples();
 }
 
 // ==================== FAVORITES ====================
@@ -1988,7 +1845,7 @@ function toggleSampleFavorite(id) {
   s.favoritedAt = s.isFavorite ? Date.now() : null;
   saveData();
   showToast(s.isFavorite ? 'Added to favorites' : 'Removed from favorites');
-  if (state.currentPage === 'favorites') renderFavorites();
+  // Favorites page removed — favorites is now a library filter
   if (state.currentPage === 'generate') renderVariations();
   if (state.currentPage === 'library') renderLibrary();
   updateInspectorFav();
@@ -2046,9 +1903,6 @@ function previewSample(id) {
     drawMiniWaveform(document.getElementById('player-mini-waveform'), s.waveformData, '#E85002');
     drawPlayerWaveform();
   });
-
-  // Open inspector
-  openInspector(id);
 
   // Update variation card highlights
   document.querySelectorAll('.variation-card').forEach(card => {
@@ -2156,11 +2010,6 @@ function openInspector(id) {
     drawWaveform(document.getElementById('inspector-waveform'), s.waveformData, '#E85002');
   });
 
-  // Tags
-  const tagsEl = document.getElementById('inspector-tags');
-  tagsEl.innerHTML = s.tags.map(t => `<span class="px-2 py-1 bg-surface border border-border rounded text-[10px] text-txt-muted">${t}</span>`).join('') +
-    `<button class="px-2 py-1 bg-bg border border-border rounded text-[10px] text-brand hover:bg-surface transition-colors" onclick="addTagPrompt()">+ Add</button>`;
-
   // Notes
   document.getElementById('inspector-notes').value = s.notes || '';
 
@@ -2179,32 +2028,6 @@ function updateSampleNotes() {
   if (s) { s.notes = document.getElementById('inspector-notes').value; saveData(); }
 }
 
-function addTagPrompt() {
-  const tag = prompt('Add a tag:');
-  if (tag && tag.trim()) {
-    const s = samples[state.inspectedSample];
-    if (s) { s.tags.push(tag.trim()); saveData(); openInspector(state.inspectedSample); }
-  }
-}
-
-function batchFromSample() {
-  if (!state.inspectedSample) return;
-  const s = samples[state.inspectedSample];
-  if (!s) return;
-  // Pre-fill params from this sample
-  if (s.type === 'loop') {
-    setGenerateMode('loop');
-    document.getElementById('bpm-input').value = s.bpm || 120;
-    document.getElementById('bpm-slider').value = s.bpm || 120;
-    document.getElementById('key-select').value = s.key || 'C';
-  } else {
-    setGenerateMode('oneshot');
-    document.getElementById('tuning-select').value = s.tuning || 'C4';
-  }
-  showToast('Generating more variations from this sample...');
-  generateSamples();
-}
-
 // ==================== LIBRARY ====================
 function getLibrarySamples() {
   let list = Object.values(samples).filter(s => s.isInLibrary && s.status === 'accepted' && s.projectId === currentProjectId);
@@ -2214,7 +2037,8 @@ function getLibrarySamples() {
   const sort = document.getElementById('lib-sort')?.value;
 
   if (search) list = list.filter(s => s.name.toLowerCase().includes(search) || s.tags.some(t => t.toLowerCase().includes(search)) || (s.key || '').toLowerCase().includes(search));
-  if (type !== 'all') list = list.filter(s => s.type === type);
+  if (type === 'favorites') list = list.filter(s => s.isFavorite);
+  else if (type !== 'all') list = list.filter(s => s.type === type);
   if (key && key !== 'all') list = list.filter(s => s.key === key);
 
   if (sort === 'recent') list.sort((a, b) => b.createdAt - a.createdAt);
@@ -2460,142 +2284,6 @@ function deleteSelected() {
 }
 
 // ==================== FAVORITES PAGE ====================
-function renderFavorites() {
-  let list = Object.values(samples).filter(s => s.isFavorite && s.projectId === currentProjectId);
-  const search = (document.getElementById('fav-search')?.value || '').toLowerCase();
-  const sort = document.getElementById('fav-sort')?.value || 'fav-recent';
-
-  if (search) list = list.filter(s => s.name.toLowerCase().includes(search) || s.tags.some(t => t.toLowerCase().includes(search)));
-
-  if (sort === 'fav-recent') list.sort((a, b) => (b.favoritedAt || 0) - (a.favoritedAt || 0));
-  else if (sort === 'recent') list.sort((a, b) => b.createdAt - a.createdAt);
-  else if (sort === 'name') list.sort((a, b) => a.name.localeCompare(b.name));
-  else if (sort === 'bpm') list.sort((a, b) => (a.bpm || 0) - (b.bpm || 0));
-
-  document.getElementById('fav-count').textContent = list.length;
-
-  if (!list.length) {
-    document.getElementById('fav-grid').classList.add('hidden');
-    document.getElementById('fav-empty').classList.remove('hidden');
-    return;
-  }
-  document.getElementById('fav-empty').classList.add('hidden');
-  document.getElementById('fav-grid').classList.remove('hidden');
-  document.getElementById('fav-grid').innerHTML = list.map(s => renderSampleCard(s)).join('');
-  requestAnimationFrame(() => {
-    document.getElementById('fav-grid').querySelectorAll('.lib-waveform').forEach(canvas => {
-      const s = samples[canvas.dataset.id];
-      if (s) drawWaveform(canvas, s.waveformData, '#E85002');
-    });
-  });
-}
-
-// ==================== HISTORY PAGE ====================
-function renderHistory() {
-  const search = (document.getElementById('hist-search')?.value || '').toLowerCase();
-  const typeFilter = document.getElementById('hist-type-filter')?.value || 'all';
-  let list = Object.values(sessions).filter(s => s.projectId === currentProjectId);
-
-  if (search) list = list.filter(s => JSON.stringify(s.params).toLowerCase().includes(search));
-  if (typeFilter !== 'all') list = list.filter(s => s.type === typeFilter);
-  list.sort((a, b) => b.createdAt - a.createdAt);
-
-  if (!list.length) {
-    document.getElementById('hist-timeline').classList.add('hidden');
-    document.getElementById('hist-empty').classList.remove('hidden');
-    return;
-  }
-  document.getElementById('hist-empty').classList.add('hidden');
-  document.getElementById('hist-timeline').classList.remove('hidden');
-
-  // Group by date
-  const groups = {};
-  list.forEach(s => {
-    const d = new Date(s.createdAt);
-    const today = new Date();
-    let label;
-    if (d.toDateString() === today.toDateString()) label = 'Today';
-    else {
-      const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
-      if (d.toDateString() === yesterday.toDateString()) label = 'Yesterday';
-      else label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    }
-    if (!groups[label]) groups[label] = [];
-    groups[label].push(s);
-  });
-
-  document.getElementById('hist-timeline').innerHTML = Object.entries(groups).map(([label, items]) => `
-    <div class="mb-6">
-      <h4 class="text-xs font-bold text-txt-dim uppercase tracking-wider mb-3">${label}</h4>
-      <div class="space-y-3">
-        ${items.map(s => {
-          const p = s.params;
-          const paramStr = s.type === 'dna-pack'
-            ? `Sound DNA Pack / ${p.bpm} BPM / ${p.key}${p.styles?.length ? ' / ' + p.styles.slice(0, 3).join(', ') : ''}`
-            : s.type === 'loop'
-            ? `${p.bpm} BPM / ${p.key} / ${p.bars} bars${p.styles?.length ? ' / ' + p.styles.join(', ') : ''}`
-            : `${p.tuning} / ${p.attack} / ${p.timbre}${p.styles?.length ? ' / ' + p.styles.join(', ') : ''}`;
-          const time = new Date(s.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-          return `
-          <div class="history-item">
-            <div class="history-dot ${s.type === 'dna-pack' ? 'loop' : s.type}"></div>
-            <div class="bg-panel border border-border rounded-xl p-4">
-              <div class="flex items-center justify-between mb-2">
-                <div class="flex items-center gap-2">
-                  <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${s.type === 'dna-pack' ? 'badge-loop' : s.type === 'loop' ? 'badge-loop' : 'badge-oneshot'}">${s.type === 'dna-pack' ? 'DNA PACK' : s.type}</span>
-                  <span class="text-sm font-bold">${s.variationIds.length} ${s.type === 'dna-pack' ? 'samples' : 'variations'}</span>
-                </div>
-                <span class="text-xs text-txt-dim">${time}</span>
-              </div>
-              <p class="text-xs text-txt-muted mb-3">${paramStr}</p>
-              <div class="flex items-center gap-4 text-xs">
-                <span class="text-emerald-400">Accepted: ${s.acceptedCount}</span>
-                <span class="text-red-400">Rejected: ${s.rejectedCount}</span>
-                <span class="text-txt-dim">Pending: ${s.variationIds.length - s.acceptedCount - s.rejectedCount}</span>
-              </div>
-              <div class="flex gap-2 mt-3">
-                <button class="text-xs text-brand hover:underline" onclick="viewSessionVariations('${s.id}')">View Variations</button>
-                <button class="text-xs text-txt-muted hover:text-txt" onclick="regenerateSession('${s.id}')">Re-generate</button>
-              </div>
-            </div>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>`).join('');
-}
-
-function viewSessionVariations(sessionId) {
-  const session = sessions[sessionId];
-  if (!session) return;
-  currentVariations = session.variationIds;
-  navigateTo('generate');
-  // Restore params
-  const p = session.params;
-  setGenerateMode(session.type);
-  if (session.type === 'loop') {
-    document.getElementById('bpm-input').value = p.bpm || 120;
-    document.getElementById('bpm-slider').value = p.bpm || 120;
-    document.getElementById('key-select').value = p.key || 'C';
-  }
-  document.getElementById('gen-empty').classList.add('hidden');
-  document.getElementById('gen-var-count').textContent = currentVariations.length + ' variations';
-  renderVariations();
-}
-
-function regenerateSession(sessionId) {
-  const session = sessions[sessionId];
-  if (!session) return;
-  navigateTo('generate');
-  const p = session.params;
-  setGenerateMode(session.type);
-  if (session.type === 'loop') {
-    document.getElementById('bpm-input').value = p.bpm || 120;
-    document.getElementById('bpm-slider').value = p.bpm || 120;
-    document.getElementById('key-select').value = p.key || 'C';
-  }
-  generateSamples();
-}
-
 // ==================== IMPORT FROM PROJECT ====================
 let importSelectedIds = new Set();
 
@@ -2711,6 +2399,8 @@ function saveApiKey() {
     ? '<span class="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0"></span><span class="text-xs text-emerald-400 font-medium">Key saved</span>'
     : '<span class="w-2 h-2 rounded-full bg-txt-dim flex-shrink-0"></span><span class="text-xs text-txt-dim font-medium">Key removed</span>';
   showToast(key ? 'API key saved' : 'API key removed');
+  const warn = document.getElementById('api-key-warning');
+  if (warn) warn.classList.toggle('hidden', !!key);
 }
 
 function testApiKey() {
@@ -2799,86 +2489,6 @@ document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
   if (e.code === 'Space' && state.currentSample) { e.preventDefault(); togglePlayPause(); }
 });
-
-// ==================== SEED DATA ====================
-function seedDemoData() {
-  if (Object.keys(samples).length > 0) return; // already has data
-
-  const sessionId = uid('ses');
-  const sessionId2 = uid('ses');
-  const sessionId3 = uid('ses');
-
-  const demoSamples = [
-    { name: 'Dusty Kick 001', type: 'loop', status: 'accepted', bpm: 90, key: 'Cm', bars: 4, style: ['Dusty', 'Lo-fi'], duration: 5.33, session: sessionId },
-    { name: 'Dusty Kick 002', type: 'loop', status: 'accepted', bpm: 90, key: 'Cm', bars: 4, style: ['Dusty', 'Lo-fi'], duration: 5.33, session: sessionId },
-    { name: 'Dusty Kick 003', type: 'loop', status: 'rejected', bpm: 90, key: 'Cm', bars: 4, style: ['Dusty', 'Lo-fi'], duration: 5.33, session: sessionId, feedback: 'too_muddy' },
-    { name: 'Dusty Kick 004', type: 'loop', status: 'pending', bpm: 90, key: 'Cm', bars: 4, style: ['Dusty', 'Lo-fi'], duration: 5.33, session: sessionId },
-    { name: 'Dusty Kick 005', type: 'loop', status: 'pending', bpm: 90, key: 'Cm', bars: 4, style: ['Dusty', 'Lo-fi'], duration: 5.33, session: sessionId },
-    { name: 'Dusty Kick 006', type: 'loop', status: 'pending', bpm: 90, key: 'Cm', bars: 4, style: ['Dusty', 'Lo-fi'], duration: 5.33, session: sessionId },
-    { name: 'Crispy Hat Loop', type: 'loop', status: 'accepted', bpm: 120, key: 'C', bars: 2, style: ['Crispy', 'Digital'], duration: 2.0, session: sessionId2 },
-    { name: 'Crispy Hat Var 2', type: 'loop', status: 'accepted', bpm: 120, key: 'C', bars: 2, style: ['Crispy', 'Digital'], duration: 2.0, session: sessionId2 },
-    { name: 'Crispy Hat Var 3', type: 'loop', status: 'rejected', bpm: 120, key: 'C', bars: 2, style: ['Crispy', 'Digital'], duration: 2.0, session: sessionId2, feedback: 'too_busy' },
-    { name: 'Crispy Hat Var 4', type: 'loop', status: 'pending', bpm: 120, key: 'C', bars: 2, style: ['Crispy', 'Digital'], duration: 2.0, session: sessionId2 },
-    { name: 'Warm Snare Hit', type: 'oneshot', status: 'accepted', tuning: 'C4', attack: 'Snappy', timbre: 'Warm', style: ['Analog', 'Punchy'], duration: 0.45, session: sessionId3 },
-    { name: 'Warm Snare Var 2', type: 'oneshot', status: 'accepted', tuning: 'C4', attack: 'Snappy', timbre: 'Warm', style: ['Analog', 'Punchy'], duration: 0.52, session: sessionId3 },
-    { name: 'Warm Snare Var 3', type: 'oneshot', status: 'pending', tuning: 'C4', attack: 'Punchy', timbre: 'Warm', style: ['Analog', 'Punchy'], duration: 0.38, session: sessionId3 },
-    { name: 'Warm Snare Var 4', type: 'oneshot', status: 'pending', tuning: 'C4', attack: 'Soft', timbre: 'Dark', style: ['Analog'], duration: 0.61, session: sessionId3 },
-    { name: 'Analog Clap 001', type: 'oneshot', status: 'accepted', tuning: 'D4', attack: 'Transient', timbre: 'Bright', style: ['Analog', 'Crispy'], duration: 0.33, session: sessionId3, fav: true },
-    { name: 'Sub Bass Loop', type: 'loop', status: 'accepted', bpm: 140, key: 'F', bars: 8, style: ['Clean', 'Digital'], duration: 6.86, session: sessionId2, fav: true },
-  ];
-
-  const sessionMap = {};
-  demoSamples.forEach((d, i) => {
-    const id = uid('smp');
-    const ts = Date.now() - (demoSamples.length - i) * 60000;
-    samples[id] = {
-      id, type: d.type, name: d.name, status: d.status,
-      duration: d.duration,
-      bpm: d.bpm || null, key: d.key || null, bars: d.bars || null,
-      tuning: d.tuning || null, attack: d.attack || null, timbre: d.timbre || null,
-      style: d.style || [], tags: d.style ? [...d.style] : [], notes: '',
-      effects: {},
-      generationSessionId: d.session,
-      variationIndex: i, parentSampleId: null,
-      modelVersion: 'ElevenLabs SFX v2',
-      createdAt: ts,
-      acceptedAt: d.status === 'accepted' ? ts + 1000 : null,
-      favoritedAt: d.fav ? ts + 2000 : null,
-      isFavorite: !!d.fav,
-      isInLibrary: d.status === 'accepted',
-      rejectionFeedback: d.feedback || null,
-      waveformData: placeholderWaveform(80),
-      projectId: 'proj_default',
-    };
-    if (!sessionMap[d.session]) sessionMap[d.session] = [];
-    sessionMap[d.session].push(id);
-    if (d.status === 'accepted' || d.status === 'rejected') {
-      decisions.push({ sampleId: id, action: d.status === 'accepted' ? 'accept' : 'reject', feedback: d.feedback, timestamp: ts });
-    }
-  });
-
-  // Create sessions
-  sessions[sessionId] = {
-    id: sessionId, type: 'loop',
-    params: { type: 'loop', bpm: 90, key: 'Cm', bars: 4, styles: ['Dusty', 'Lo-fi'], varCount: 6, model: 'ElevenLabs SFX v2' },
-    variationIds: sessionMap[sessionId] || [], acceptedCount: 2, rejectedCount: 1,
-    createdAt: Date.now() - 900000, projectId: 'proj_default',
-  };
-  sessions[sessionId2] = {
-    id: sessionId2, type: 'loop',
-    params: { type: 'loop', bpm: 120, key: 'C', bars: 2, styles: ['Crispy', 'Digital'], varCount: 4, model: 'ElevenLabs SFX v2' },
-    variationIds: sessionMap[sessionId2] || [], acceptedCount: 3, rejectedCount: 1,
-    createdAt: Date.now() - 600000, projectId: 'proj_default',
-  };
-  sessions[sessionId3] = {
-    id: sessionId3, type: 'oneshot',
-    params: { type: 'oneshot', tuning: 'C4', attack: 'Snappy', timbre: 'Warm', styles: ['Analog', 'Punchy'], varCount: 5, model: 'ElevenLabs SFX v2' },
-    variationIds: sessionMap[sessionId3] || [], acceptedCount: 3, rejectedCount: 0,
-    createdAt: Date.now() - 300000, projectId: 'proj_default',
-  };
-
-  saveData();
-}
 
 // ==================== SOUND DNA ====================
 
@@ -3555,10 +3165,9 @@ function acceptAllDnaSamples() {
 
 // ==================== INIT ====================
 loadData();
-seedDemoData();
 migrateToProjects();
 renderProjectSwitcher();
-navigateTo('home');
+navigateTo('generate');
 
 // Pre-generate audio + real waveforms on first user interaction
 document.addEventListener('click', function initAudioOnGesture() {
