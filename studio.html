@@ -224,7 +224,7 @@ input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
       <button class="w-9 h-9 rounded-lg bg-surface border border-border text-txt-muted hover:text-txt hover:bg-dk-gray transition-colors flex items-center justify-center" onclick="showToast('No new notifications')">
         <span class="material-symbols-outlined text-[18px]">notifications</span>
       </button>
-      <button class="w-9 h-9 rounded-lg bg-surface border border-border text-txt-muted hover:text-txt hover:bg-dk-gray transition-colors flex items-center justify-center" onclick="showToast('Settings coming soon')">
+      <button class="w-9 h-9 rounded-lg bg-surface border border-border text-txt-muted hover:text-txt hover:bg-dk-gray transition-colors flex items-center justify-center" onclick="openSettingsModal()">
         <span class="material-symbols-outlined text-[18px]">settings</span>
       </button>
       <div class="w-9 h-9 rounded-full bg-brand flex items-center justify-center text-xs font-bold text-txt cursor-pointer ml-1" onclick="showToast('Profile')">U</div>
@@ -385,7 +385,7 @@ input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
           <option value="4">4</option><option value="6" selected>6</option><option value="8">8</option>
         </select>
         <select id="model-select" class="bg-bg border border-border rounded-lg px-3 py-2 text-sm text-txt whitespace-nowrap">
-          <option>Sonic v3.5</option><option>Sonic v3.0</option><option>Sonic v2.0</option>
+          <option value="eleven_text_to_sound_v2">ElevenLabs SFX v2</option><option value="eleven_text_to_sound_v1">ElevenLabs SFX v1</option>
         </select>
         <button id="gen-btn" class="bg-brand hover:bg-brand-hover text-txt font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 text-sm transition-all shadow-lg shadow-brand/20 whitespace-nowrap" onclick="generateSamples()">
           <span class="material-symbols-outlined text-[18px]">bolt</span>
@@ -811,7 +811,57 @@ input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
   </div>
 </div>
 
+<!-- Settings modal -->
+<div id="settings-modal" class="modal-overlay" onclick="if(event.target===this)closeSettingsModal()">
+  <div class="bg-panel border border-border rounded-2xl w-full max-w-md animate-fadeIn">
+    <div class="p-6 pb-4 border-b border-border flex items-center justify-between">
+      <h3 class="text-lg font-bold">Settings</h3>
+      <button class="w-7 h-7 rounded-full bg-surface hover:bg-dk-gray flex items-center justify-center text-txt-muted hover:text-txt transition-colors" onclick="closeSettingsModal()">
+        <span class="material-symbols-outlined text-[16px]">close</span>
+      </button>
+    </div>
+    <div class="p-6 space-y-5">
+      <!-- API Key Section -->
+      <div>
+        <label class="block text-sm font-bold mb-2">ElevenLabs API Key</label>
+        <p class="text-xs text-txt-muted mb-3">Required for AI-generated samples. Get a key at <a href="https://elevenlabs.io/developers" target="_blank" class="text-brand hover:underline">elevenlabs.io/developers</a></p>
+        <div class="flex gap-2">
+          <div class="relative flex-1">
+            <input id="settings-api-key" type="password" class="w-full bg-bg border border-border rounded-lg px-4 py-2.5 text-sm text-txt placeholder:text-txt-dim pr-10 font-mono" placeholder="xi_..." />
+            <button class="absolute right-2 top-1/2 -translate-y-1/2 text-txt-dim hover:text-txt p-1" onclick="toggleApiKeyVisibility()">
+              <span class="material-symbols-outlined text-[18px]" id="api-key-eye">visibility_off</span>
+            </button>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 mt-3">
+          <button id="api-test-btn" class="flex items-center gap-2 bg-surface border border-border text-txt px-4 py-2 rounded-lg text-sm font-bold hover:bg-dk-gray transition-colors" onclick="testApiKey()">
+            <span class="material-symbols-outlined text-[16px]">bolt</span>
+            <span id="api-test-label">Test Connection</span>
+          </button>
+          <button class="flex items-center gap-2 bg-brand hover:bg-brand-hover text-txt px-4 py-2 rounded-lg text-sm font-bold transition-colors" onclick="saveApiKey()">
+            <span class="material-symbols-outlined text-[16px]">save</span> Save
+          </button>
+          <div id="api-status" class="flex items-center gap-1.5 ml-auto"></div>
+        </div>
+      </div>
+      <!-- Divider -->
+      <div class="border-t border-border"></div>
+      <!-- Clear Data -->
+      <div>
+        <label class="block text-sm font-bold mb-1">Data</label>
+        <p class="text-xs text-txt-muted mb-3">Clear all local data including samples, projects, and audio.</p>
+        <button class="flex items-center gap-2 text-red-400 border border-red-500/30 px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-500/10 transition-colors" onclick="clearAllDataConfirm()">
+          <span class="material-symbols-outlined text-[16px]">delete_forever</span> Clear All Data
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
+// ==================== API CONFIG ====================
+let ELEVENLABS_API_KEY = localStorage.getItem('fiire_api_key') || '';
+
 // ==================== STATE ====================
 const state = {
   currentPage: 'dashboard',
@@ -880,11 +930,279 @@ function getProjectSampleCount(projectId) {
   return Object.values(samples).filter(s => s.projectId === projectId).length;
 }
 
+// ==================== INDEXEDDB AUDIO STORAGE ====================
+let audioDB = null;
+const AUDIO_DB_NAME = 'fiire_audio';
+const AUDIO_STORE = 'buffers';
+
+function openAudioDB() {
+  if (audioDB) return Promise.resolve(audioDB);
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(AUDIO_DB_NAME, 1);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(AUDIO_STORE)) {
+        db.createObjectStore(AUDIO_STORE);
+      }
+    };
+    req.onsuccess = (e) => { audioDB = e.target.result; resolve(audioDB); };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function saveAudioBlob(sampleId, arrayBuffer) {
+  return openAudioDB().then(db => {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(AUDIO_STORE, 'readwrite');
+      tx.objectStore(AUDIO_STORE).put(arrayBuffer, sampleId);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  }).catch(() => {}); // fail silently
+}
+
+function loadAudioBlob(sampleId) {
+  return openAudioDB().then(db => {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(AUDIO_STORE, 'readonly');
+      const req = tx.objectStore(AUDIO_STORE).get(sampleId);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  }).catch(() => null);
+}
+
+function deleteAudioBlob(sampleId) {
+  return openAudioDB().then(db => {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(AUDIO_STORE, 'readwrite');
+      tx.objectStore(AUDIO_STORE).delete(sampleId);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  }).catch(() => {});
+}
+
+function deleteAudioBlobsForProject(projectId) {
+  const ids = Object.values(samples).filter(s => s.projectId === projectId).map(s => s.id);
+  return Promise.all(ids.map(id => deleteAudioBlob(id)));
+}
+
 // ==================== UTILITIES ====================
 function uid(prefix) { return prefix + '_' + (++varIdCounter) + '_' + Date.now().toString(36); }
 function formatTime(s) { const m = Math.floor(s/60); const sec = Math.floor(s%60); return m+':'+(sec<10?'0':'')+sec; }
 function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2000); }
 function closeModal() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open')); state.rejectingSampleId = null; }
+
+// ==================== AUDIO ENGINE ====================
+let audioCtx = null;
+let masterGain = null;
+let currentSource = null;
+let audioBuffers = {}; // sampleId -> AudioBuffer
+let playbackStartTime = 0;
+let playbackOffset = 0;
+
+function initAudioContext() {
+  if (audioCtx) return audioCtx;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = state.volume / 100;
+  masterGain.connect(audioCtx.destination);
+  return audioCtx;
+}
+
+function ensureAudioContext() {
+  initAudioContext();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function generateSyntheticAudio(sample) {
+  ensureAudioContext();
+  const dur = sample.duration || 2;
+  const sr = audioCtx.sampleRate;
+  const len = Math.ceil(dur * sr);
+  const buf = audioCtx.createBuffer(2, len, sr);
+  const bpm = sample.bpm || 120;
+
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    if (sample.type === 'loop') {
+      const beatLen = Math.floor(60 / bpm * sr);
+      for (let i = 0; i < len; i++) {
+        const posInBeat = i % beatLen;
+        const beatFrac = posInBeat / beatLen;
+        let val = 0;
+        // Kick on downbeats
+        if (beatFrac < 0.06) {
+          const env = 1 - beatFrac / 0.06;
+          const freq = 55 + 180 * env * env;
+          val += Math.sin(2 * Math.PI * freq * i / sr) * env * env * 0.7;
+        }
+        // Snare on beats 2 and 4
+        const halfBeat = i % (beatLen * 2);
+        const halfFrac = halfBeat / (beatLen * 2);
+        if (halfFrac > 0.49 && halfFrac < 0.54) {
+          const t = (halfFrac - 0.49) / 0.05;
+          const env = Math.max(0, 1 - t * 1.5);
+          val += (Math.random() * 2 - 1) * env * 0.35;
+          val += Math.sin(2 * Math.PI * 200 * i / sr) * env * 0.2;
+        }
+        // Hi-hat on 8ths
+        const eighthLen = Math.floor(beatLen / 2);
+        const eighthPos = i % eighthLen;
+        const eighthFrac = eighthPos / eighthLen;
+        if (eighthFrac < 0.015) {
+          const env = 1 - eighthFrac / 0.015;
+          val += (Math.random() * 2 - 1) * env * 0.12;
+        }
+        d[i] = val;
+      }
+    } else {
+      // One-shot: percussive hit
+      for (let i = 0; i < len; i++) {
+        const t = i / sr;
+        const env = Math.exp(-t * 20);
+        const pitch = 180 + 600 * Math.exp(-t * 40);
+        d[i] = Math.sin(2 * Math.PI * pitch * t) * env * 0.55
+             + (Math.random() * 2 - 1) * env * 0.35;
+      }
+    }
+    // Slight stereo variation on right channel
+    if (ch === 1) {
+      for (let i = 0; i < len; i++) d[i] *= 0.95 + Math.random() * 0.1;
+    }
+  }
+  return buf;
+}
+
+function cacheAndPersistBuffer(sampleId, buf) {
+  audioBuffers[sampleId] = buf;
+  updateSampleWaveform(sampleId, buf);
+  // Persist to IndexedDB as WAV
+  const wav = audioBufferToWav(buf);
+  saveAudioBlob(sampleId, wav);
+  return buf;
+}
+
+function getAudioBuffer(sampleId) {
+  if (audioBuffers[sampleId]) return Promise.resolve(audioBuffers[sampleId]);
+  const s = samples[sampleId];
+  if (!s) return Promise.resolve(null);
+  ensureAudioContext();
+
+  // Try IndexedDB first
+  return loadAudioBlob(sampleId).then(stored => {
+    if (stored) {
+      return audioCtx.decodeAudioData(stored).then(buf => {
+        audioBuffers[sampleId] = buf;
+        updateSampleWaveform(sampleId, buf);
+        return buf;
+      });
+    }
+    // If sample has a real audio URL, fetch and decode
+    if (s.audioUrl) {
+      return fetch(s.audioUrl)
+        .then(r => r.arrayBuffer())
+        .then(ab => audioCtx.decodeAudioData(ab))
+        .then(buf => cacheAndPersistBuffer(sampleId, buf))
+        .catch(() => cacheAndPersistBuffer(sampleId, generateSyntheticAudio(s)));
+    }
+    // Generate synthetic placeholder
+    return cacheAndPersistBuffer(sampleId, generateSyntheticAudio(s));
+  }).catch(() => {
+    // IndexedDB failed, fall back to generation
+    return cacheAndPersistBuffer(sampleId, generateSyntheticAudio(s));
+  });
+}
+
+function stopCurrentSource() {
+  if (currentSource) {
+    try { currentSource.onended = null; currentSource.stop(); } catch(e) {}
+    try { currentSource.disconnect(); } catch(e) {}
+    currentSource = null;
+  }
+}
+
+function playAudioBuffer(sampleId, offset) {
+  offset = offset || 0;
+  ensureAudioContext();
+  stopCurrentSource();
+  return getAudioBuffer(sampleId).then(buf => {
+    if (!buf) return;
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    src.loop = state.loopPlayback;
+    // Route through effects chain if inspector is open for this sample
+    if (state.inspectedSample === sampleId) {
+      buildFxChain();
+      src.connect(fxDistortion);
+      const vals = getEffectValues();
+      Object.entries(vals).forEach(([fx, v]) => applyFxValue(fx, v));
+    } else {
+      src.connect(masterGain);
+    }
+    playbackStartTime = audioCtx.currentTime;
+    playbackOffset = offset;
+    state.totalTime = buf.duration;
+    src.start(0, offset);
+    src.onended = () => {
+      if (currentSource === src && !state.loopPlayback) {
+        state.isPlaying = false;
+        state.currentTime = state.totalTime;
+        updatePlayButton();
+        stopProgress();
+        document.getElementById('player-current-time').textContent = formatTime(state.totalTime);
+        drawPlayerWaveform(1);
+      }
+    };
+    currentSource = src;
+  });
+}
+
+function extractPeaks(audioBuffer, barCount) {
+  barCount = barCount || 100;
+  const chan = audioBuffer.getChannelData(0);
+  const len = chan.length;
+  const chunkSize = Math.floor(len / barCount);
+  const peaks = [];
+  let maxPeak = 0;
+  for (let i = 0; i < barCount; i++) {
+    const start = i * chunkSize;
+    const end = Math.min(start + chunkSize, len);
+    let peak = 0;
+    for (let j = start; j < end; j++) {
+      const abs = Math.abs(chan[j]);
+      if (abs > peak) peak = abs;
+    }
+    peaks.push(peak);
+    if (peak > maxPeak) maxPeak = peak;
+  }
+  if (maxPeak > 0) {
+    for (let i = 0; i < peaks.length; i++) peaks[i] = peaks[i] / maxPeak;
+  }
+  return peaks;
+}
+
+function updateSampleWaveform(sampleId, audioBuffer) {
+  const s = samples[sampleId];
+  if (!s) return;
+  s.waveformData = extractPeaks(audioBuffer, 80 + Math.floor(Math.random() * 40));
+  // Re-render any visible waveform canvases for this sample
+  document.querySelectorAll(`canvas[data-id="${sampleId}"]`).forEach(canvas => {
+    if (canvas.classList.contains('var-waveform') || canvas.classList.contains('lib-waveform')) {
+      drawWaveform(canvas, s.waveformData, s.status === 'rejected' ? '#444' : '#E85002');
+    } else if (canvas.classList.contains('lib-waveform-row')) {
+      drawMiniWaveform(canvas, s.waveformData, '#E85002');
+    }
+  });
+}
+
+function getPlaybackTime() {
+  if (!audioCtx || !state.isPlaying) return state.currentTime;
+  const t = playbackOffset + (audioCtx.currentTime - playbackStartTime);
+  if (state.loopPlayback && state.totalTime > 0) return t % state.totalTime;
+  return Math.min(t, state.totalTime);
+}
 
 // ==================== PROJECTS ====================
 let projectDropdownOpen = false;
@@ -1003,8 +1321,8 @@ function deleteProjectConfirm(id) {
   document.getElementById('confirm-title').textContent = 'Delete Project';
   document.getElementById('confirm-msg').textContent = `Delete "${p.name}" and all its samples? This can't be undone.`;
   document.getElementById('confirm-action').onclick = () => {
-    // Delete all samples and sessions for this project
-    Object.keys(samples).forEach(sid => { if (samples[sid].projectId === id) delete samples[sid]; });
+    // Delete all samples, sessions, and audio blobs for this project
+    Object.keys(samples).forEach(sid => { if (samples[sid].projectId === id) { deleteAudioBlob(sid); delete audioBuffers[sid]; delete samples[sid]; } });
     Object.keys(sessions).forEach(sid => { if (sessions[sid].projectId === id) delete sessions[sid]; });
     decisions = decisions.filter(d => samples[d.sampleId]); // clean up orphaned decisions
     delete projects[id];
@@ -1047,11 +1365,9 @@ function navigateTo(page) {
 }
 
 // ==================== WAVEFORM RENDERING ====================
-function generateWaveformData(length) {
+function placeholderWaveform(length) {
   const data = [];
-  for (let i = 0; i < length; i++) {
-    data.push(0.1 + Math.random() * 0.9);
-  }
+  for (let i = 0; i < (length || 80); i++) data.push(0.3);
   return data;
 }
 
@@ -1177,73 +1493,178 @@ function getGenParams() {
   }
 }
 
+function buildSfxPrompt(params) {
+  const parts = [];
+  if (params.type === 'loop') {
+    parts.push(`${params.bpm} BPM`);
+    if (params.key) parts.push(`${params.key}`);
+    if (params.styles?.length) parts.push(params.styles.join(', '));
+    parts.push('drum loop');
+    if (params.bars) parts.push(`${params.bars} bars`);
+  } else {
+    if (params.attack) parts.push(params.attack.toLowerCase());
+    if (params.timbre) parts.push(params.timbre.toLowerCase());
+    if (params.styles?.length) parts.push(params.styles.join(', '));
+    parts.push('one-shot percussion hit');
+    if (params.tuning) parts.push(`tuned to ${params.tuning}`);
+  }
+  if (params.prompt) parts.push(params.prompt);
+  return parts.join(', ');
+}
+
+function calcDuration(params) {
+  if (params.type === 'loop') {
+    const secsPerBeat = 60 / (params.bpm || 120);
+    return Math.min(30, Math.max(0.5, params.bars * secsPerBeat * (params.bpm < 100 ? 2 : 1)));
+  }
+  return 1.5; // one-shot default
+}
+
+function callElevenLabsSfx(prompt, duration, isLoop, modelId) {
+  return fetch('https://api.elevenlabs.io/v1/sound-generation?output_format=pcm_44100', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'xi-api-key': ELEVENLABS_API_KEY,
+    },
+    body: JSON.stringify({
+      text: prompt,
+      duration_seconds: Math.round(duration * 10) / 10,
+      prompt_influence: 0.3,
+      loop: isLoop,
+      model_id: modelId || 'eleven_text_to_sound_v2',
+    }),
+  }).then(res => {
+    if (!res.ok) return res.text().then(t => { throw new Error(`API ${res.status}: ${t}`); });
+    return res.arrayBuffer();
+  });
+}
+
+function pcmToAudioBuffer(pcmData, sampleRate) {
+  ensureAudioContext();
+  const int16 = new Int16Array(pcmData);
+  const numSamples = int16.length;
+  const buf = audioCtx.createBuffer(1, numSamples, sampleRate || 44100);
+  const chan = buf.getChannelData(0);
+  for (let i = 0; i < numSamples; i++) {
+    chan[i] = int16[i] / 32768;
+  }
+  return buf;
+}
+
 function generateSamples() {
   if (state.generating) return;
   state.generating = true;
   const params = getGenParams();
+  const useAPI = ELEVENLABS_API_KEY && ELEVENLABS_API_KEY.length > 0;
 
   document.getElementById('gen-loading').classList.remove('hidden');
   document.getElementById('gen-empty').classList.add('hidden');
   document.getElementById('gen-footer').classList.add('hidden');
   document.getElementById('var-grid').innerHTML = '';
 
-  setTimeout(() => {
-    const sessionId = uid('ses');
-    const variationIds = [];
+  const sessionId = uid('ses');
+  const variationIds = [];
+  const duration = calcDuration(params);
+  const sfxPrompt = buildSfxPrompt(params);
+  const isLoop = params.type === 'loop';
 
-    for (let i = 0; i < params.varCount; i++) {
-      const id = uid('smp');
-      const duration = params.type === 'loop'
-        ? (params.bars * 60 / params.bpm * (params.bpm < 100 ? 2 : 1))
-        : (0.3 + Math.random() * 1.5);
-
-      samples[id] = {
-        id, type: params.type,
-        name: params.type === 'loop' ? `Loop ${Object.keys(samples).length + 1}` : `One-Shot ${Object.keys(samples).length + 1}`,
-        status: 'pending',
-        duration: Math.round(duration * 100) / 100,
-        bpm: params.bpm || null,
-        key: params.key || null,
-        bars: params.bars || null,
-        tuning: params.tuning || null,
-        attack: params.attack || null,
-        timbre: params.timbre || null,
-        style: params.styles || [],
-        tags: params.styles ? [...params.styles] : [],
-        notes: '',
-        effects: { distortion: 0, reverb: 0, delay: 0, filterLP: 100, bitcrush: 0, saturation: 0 },
-        generationSessionId: sessionId,
-        variationIndex: i,
-        parentSampleId: null,
-        modelVersion: params.model,
-        createdAt: Date.now() - (params.varCount - i) * 100,
-        acceptedAt: null,
-        favoritedAt: null,
-        isFavorite: false,
-        isInLibrary: false,
-        rejectionFeedback: null,
-        waveformData: generateWaveformData(80 + Math.floor(Math.random() * 40)),
-        projectId: currentProjectId,
-      };
-      variationIds.push(id);
-    }
-
-    sessions[sessionId] = {
-      id: sessionId, type: params.type, params,
-      variationIds, acceptedCount: 0, rejectedCount: 0,
-      createdAt: Date.now(),
+  // Create sample shells
+  for (let i = 0; i < params.varCount; i++) {
+    const id = uid('smp');
+    samples[id] = {
+      id, type: params.type,
+      name: params.type === 'loop' ? `Loop ${Object.keys(samples).length + 1}` : `One-Shot ${Object.keys(samples).length + 1}`,
+      status: 'pending',
+      duration: Math.round(duration * 100) / 100,
+      bpm: params.bpm || null,
+      key: params.key || null,
+      bars: params.bars || null,
+      tuning: params.tuning || null,
+      attack: params.attack || null,
+      timbre: params.timbre || null,
+      style: params.styles || [],
+      tags: params.styles ? [...params.styles] : [],
+      notes: '',
+      effects: { distortion: 0, reverb: 0, delay: 0, filterLP: 100, bitcrush: 0, saturation: 0 },
+      generationSessionId: sessionId,
+      variationIndex: i,
+      parentSampleId: null,
+      modelVersion: useAPI ? 'ElevenLabs SFX v2' : 'Synthetic',
+      createdAt: Date.now() - (params.varCount - i) * 100,
+      acceptedAt: null,
+      favoritedAt: null,
+      isFavorite: false,
+      isInLibrary: false,
+      rejectionFeedback: null,
+      waveformData: placeholderWaveform(80),
       projectId: currentProjectId,
     };
+    variationIds.push(id);
+  }
 
-    currentVariations = variationIds;
+  sessions[sessionId] = {
+    id: sessionId, type: params.type, params,
+    variationIds, acceptedCount: 0, rejectedCount: 0,
+    createdAt: Date.now(),
+    projectId: currentProjectId,
+  };
+
+  currentVariations = variationIds;
+  saveData();
+
+  if (!useAPI) {
+    // No API key — fall back to synthetic audio
     state.generating = false;
-    saveData();
     renderVariations();
     document.getElementById('gen-loading').classList.add('hidden');
     document.getElementById('gen-footer').classList.remove('hidden');
     document.getElementById('gen-var-count').textContent = variationIds.length + ' variations';
-    showToast(`Generated ${variationIds.length} variations!`);
-  }, 2500);
+    showToast('No API key — generated synthetic placeholders');
+    ensureAudioContext();
+    variationIds.forEach(vid => getAudioBuffer(vid));
+    return;
+  }
+
+  // Call ElevenLabs SFX API for each variation
+  let completed = 0;
+  let failed = 0;
+
+  variationIds.forEach((vid, i) => {
+    // Stagger requests slightly to avoid rate limits
+    setTimeout(() => {
+      callElevenLabsSfx(sfxPrompt, duration, isLoop, params.model)
+        .then(pcmData => {
+          ensureAudioContext();
+          const buf = pcmToAudioBuffer(pcmData, 44100);
+          samples[vid].duration = buf.duration;
+          cacheAndPersistBuffer(vid, buf);
+          saveData();
+        })
+        .catch(err => {
+          console.error(`Generation failed for ${vid}:`, err);
+          failed++;
+          // Fall back to synthetic for this variation
+          ensureAudioContext();
+          getAudioBuffer(vid);
+        })
+        .finally(() => {
+          completed++;
+          if (completed === variationIds.length) {
+            state.generating = false;
+            renderVariations();
+            document.getElementById('gen-loading').classList.add('hidden');
+            document.getElementById('gen-footer').classList.remove('hidden');
+            document.getElementById('gen-var-count').textContent = variationIds.length + ' variations';
+            if (failed > 0) {
+              showToast(`Generated ${completed - failed} samples (${failed} fell back to synthetic)`);
+            } else {
+              showToast(`Generated ${completed} samples from ElevenLabs!`);
+            }
+          }
+        });
+    }, i * 500); // 500ms stagger between requests
+  });
 }
 
 function renderVariations() {
@@ -1495,11 +1916,13 @@ function previewSample(id) {
   document.getElementById('player-current-time').textContent = '0:00';
   updatePlayButton();
   updatePlayerFav();
-  startProgress();
 
-  // Draw waveforms in player
-  drawMiniWaveform(document.getElementById('player-mini-waveform'), s.waveformData, '#E85002');
-  drawPlayerWaveform();
+  // Real audio playback
+  playAudioBuffer(id, 0).then(() => {
+    startProgress();
+    drawMiniWaveform(document.getElementById('player-mini-waveform'), s.waveformData, '#E85002');
+    drawPlayerWaveform();
+  });
 
   // Open inspector
   openInspector(id);
@@ -1518,7 +1941,14 @@ function togglePlayPause() {
   if (!state.currentSample) return;
   state.isPlaying = !state.isPlaying;
   updatePlayButton();
-  state.isPlaying ? startProgress() : stopProgress();
+  if (state.isPlaying) {
+    playAudioBuffer(state.currentSample, state.currentTime);
+    startProgress();
+  } else {
+    state.currentTime = getPlaybackTime();
+    stopCurrentSource();
+    stopProgress();
+  }
 }
 
 function updatePlayButton() {
@@ -1530,14 +1960,20 @@ function updatePlayButton() {
 function startProgress() {
   stopProgress();
   state.progressInterval = setInterval(() => {
-    if (state.currentTime < state.totalTime) {
-      state.currentTime += 0.05;
-      const pct = state.currentTime / state.totalTime;
-      document.getElementById('player-current-time').textContent = formatTime(state.currentTime);
+    if (!state.isPlaying) return;
+    const t = getPlaybackTime();
+    state.currentTime = t;
+    if (t < state.totalTime || state.loopPlayback) {
+      const displayTime = state.loopPlayback ? t % state.totalTime : t;
+      const pct = displayTime / state.totalTime;
+      document.getElementById('player-current-time').textContent = formatTime(displayTime);
       drawPlayerWaveform(pct);
     } else {
-      if (state.loopPlayback) { state.currentTime = 0; }
-      else { state.isPlaying = false; updatePlayButton(); stopProgress(); }
+      state.isPlaying = false;
+      updatePlayButton();
+      stopProgress();
+      document.getElementById('player-current-time').textContent = formatTime(state.totalTime);
+      drawPlayerWaveform(1);
     }
   }, 50);
 }
@@ -1557,10 +1993,14 @@ function seekSample(e) {
   state.currentTime = p * state.totalTime;
   document.getElementById('player-current-time').textContent = formatTime(state.currentTime);
   drawPlayerWaveform(p);
+  if (state.isPlaying) {
+    playAudioBuffer(state.currentSample, state.currentTime);
+  }
 }
 
 function toggleLoopPlayback() {
   state.loopPlayback = !state.loopPlayback;
+  if (currentSource) currentSource.loop = state.loopPlayback;
   document.getElementById('btn-loop').classList.toggle('text-brand', state.loopPlayback);
   document.getElementById('btn-loop').classList.toggle('text-txt-muted', !state.loopPlayback);
   const inspBtn = document.getElementById('inspector-loop-btn');
@@ -1571,8 +2011,8 @@ function toggleLoopPlayback() {
   showToast(state.loopPlayback ? 'Loop on' : 'Loop off');
 }
 
-function setVolume(v) { state.volume = parseInt(v); state.isMuted = false; updateVolumeIcon(); }
-function toggleMute() { state.isMuted = !state.isMuted; document.getElementById('volume-slider').value = state.isMuted ? 0 : state.volume; updateVolumeIcon(); }
+function setVolume(v) { state.volume = parseInt(v); state.isMuted = false; if (masterGain) masterGain.gain.value = state.volume / 100; updateVolumeIcon(); }
+function toggleMute() { state.isMuted = !state.isMuted; document.getElementById('volume-slider').value = state.isMuted ? 0 : state.volume; if (masterGain) masterGain.gain.value = state.isMuted ? 0 : state.volume / 100; updateVolumeIcon(); }
 function updateVolumeIcon() { const i = document.getElementById('volume-icon'); const v = state.isMuted ? 0 : state.volume; i.textContent = v === 0 ? 'volume_off' : v < 40 ? 'volume_down' : 'volume_up'; }
 
 // ==================== INSPECTOR ====================
@@ -1617,18 +2057,201 @@ function openInspector(id) {
 function closeInspector() {
   document.getElementById('inspector-panel').style.display = 'none';
   state.inspectedSample = null;
+  // Tear down effects chain and reconnect source direct to master
+  if (fxChainConnected && currentSource) {
+    try { currentSource.disconnect(); } catch(e) {}
+    teardownFxChain();
+    try { currentSource.connect(masterGain); } catch(e) {}
+  } else {
+    teardownFxChain();
+  }
+}
+
+// Effects chain nodes (live preview)
+let fxDistortion = null;
+let fxReverb = null;
+let fxDelay = null;
+let fxDelayGain = null;
+let fxFilter = null;
+let fxBitcrush = null;
+let fxSaturation = null;
+let fxChainConnected = false;
+
+function teardownFxChain() {
+  if (!fxChainConnected) return;
+  try {
+    [fxDistortion, fxSaturation, fxBitcrush, fxFilter, fxDelay, fxDelayGain].forEach(n => { if (n) n.disconnect(); });
+    if (fxReverb) { fxReverb.disconnect(); if (fxReverb._wetGain) fxReverb._wetGain.disconnect(); if (fxReverb._dryGain) fxReverb._dryGain.disconnect(); }
+  } catch(e) {}
+  fxDistortion = fxSaturation = fxBitcrush = fxFilter = fxDelay = fxDelayGain = fxReverb = null;
+  fxChainConnected = false;
+}
+
+function buildFxChain() {
+  if (fxChainConnected) return;
+  ensureAudioContext();
+  const ctx = audioCtx;
+
+  // Distortion (waveshaper)
+  fxDistortion = ctx.createWaveShaper();
+  fxDistortion.oversample = '4x';
+  setDistortionCurve(0);
+
+  // Saturation (softer waveshaper)
+  fxSaturation = ctx.createWaveShaper();
+  fxSaturation.oversample = '2x';
+  setSaturationCurve(0);
+
+  // Bitcrush (via sample rate reduction trick using a script processor)
+  // We'll use a simple gain as placeholder — real bitcrush needs AudioWorklet
+  fxBitcrush = ctx.createGain();
+  fxBitcrush.gain.value = 1;
+
+  // LP Filter
+  fxFilter = ctx.createBiquadFilter();
+  fxFilter.type = 'lowpass';
+  fxFilter.frequency.value = 20000;
+  fxFilter.Q.value = 0.7;
+
+  // Delay
+  fxDelay = ctx.createDelay(1.0);
+  fxDelay.delayTime.value = 0;
+  fxDelayGain = ctx.createGain();
+  fxDelayGain.gain.value = 0;
+
+  // Reverb (convolver with generated impulse response)
+  fxReverb = ctx.createConvolver();
+  fxReverb.buffer = generateImpulseResponseSync(2, 2);
+
+  // Dry/wet for reverb
+  fxReverb._wetGain = ctx.createGain();
+  fxReverb._wetGain.gain.value = 0;
+  fxReverb._dryGain = ctx.createGain();
+  fxReverb._dryGain.gain.value = 1;
+
+  // Reconnect: source → distortion → saturation → bitcrush → filter → (dry + delay) → (dry + reverb wet) → masterGain
+  // We need to disconnect masterGain from currentSource first
+  // Actually, we'll insert the chain between source and masterGain
+  // Chain: [source connects to fxDistortion] → saturation → bitcrush → filter → dryGain → masterGain
+  //                                                                            → delay → delayGain → masterGain
+  //                                                                            → reverb → wetGain → masterGain
+  fxDistortion.connect(fxSaturation);
+  fxSaturation.connect(fxBitcrush);
+  fxBitcrush.connect(fxFilter);
+  fxFilter.connect(fxReverb._dryGain);
+  fxReverb._dryGain.connect(masterGain);
+
+  // Delay send
+  fxFilter.connect(fxDelay);
+  fxDelay.connect(fxDelayGain);
+  fxDelayGain.connect(masterGain);
+  // Delay feedback
+  fxDelayGain.connect(fxDelay);
+
+  // Reverb send
+  fxFilter.connect(fxReverb);
+  fxReverb.connect(fxReverb._wetGain);
+  fxReverb._wetGain.connect(masterGain);
+
+  fxChainConnected = true;
+}
+
+function generateImpulseResponseSync(duration, decay) {
+  ensureAudioContext();
+  const sr = audioCtx.sampleRate;
+  const len = sr * duration;
+  const buf = audioCtx.createBuffer(2, len, sr);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    for (let i = 0; i < len; i++) {
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+    }
+  }
+  return buf;
+}
+
+function setDistortionCurve(amount) {
+  if (!fxDistortion) return;
+  const k = amount * 4;
+  const samples = 44100;
+  const curve = new Float32Array(samples);
+  for (let i = 0; i < samples; i++) {
+    const x = (i * 2) / samples - 1;
+    curve[i] = k > 0 ? ((3 + k) * x * 20 * (Math.PI / 180)) / (Math.PI + k * Math.abs(x)) : x;
+  }
+  fxDistortion.curve = k > 0 ? curve : null;
+}
+
+function setSaturationCurve(amount) {
+  if (!fxSaturation) return;
+  if (amount <= 0) { fxSaturation.curve = null; return; }
+  const samples = 44100;
+  const curve = new Float32Array(samples);
+  const k = amount * 2;
+  for (let i = 0; i < samples; i++) {
+    const x = (i * 2) / samples - 1;
+    curve[i] = Math.tanh(x * (1 + k));
+  }
+  fxSaturation.curve = curve;
+}
+
+function getEffectValues() {
+  const vals = {};
+  document.querySelectorAll('#inspector-panel .effect-slider').forEach(slider => {
+    vals[slider.dataset.fx] = parseInt(slider.value);
+  });
+  return vals;
 }
 
 function updateEffect(slider) {
   const val = slider.value;
   slider.nextElementSibling.textContent = val + '%';
+
+  // Live preview: update effects chain in real-time
+  if (!fxChainConnected || !state.isPlaying) return;
+  const fx = slider.dataset.fx;
+  const v = parseInt(val);
+  applyFxValue(fx, v);
+}
+
+function applyFxValue(fx, v) {
+  switch (fx) {
+    case 'distortion': setDistortionCurve(v / 100); break;
+    case 'saturation': setSaturationCurve(v / 100); break;
+    case 'reverb':
+      if (fxReverb._wetGain) fxReverb._wetGain.gain.value = v / 100;
+      if (fxReverb._dryGain) fxReverb._dryGain.gain.value = 1 - (v / 200);
+      break;
+    case 'delay':
+      if (fxDelay) fxDelay.delayTime.value = v > 0 ? 0.15 + (v / 100) * 0.35 : 0;
+      if (fxDelayGain) fxDelayGain.gain.value = v > 0 ? Math.min(0.55, 0.15 + (v / 100) * 0.4) : 0;
+      break;
+    case 'filterLP':
+      if (fxFilter) fxFilter.frequency.value = 200 + (v / 100) * 19800;
+      break;
+    case 'bitcrush':
+      // Reduce gain slightly to simulate bitcrush harshness
+      if (fxBitcrush) fxBitcrush.gain.value = v > 0 ? 1 + (v / 100) * 0.3 : 1;
+      break;
+  }
+}
+
+function connectSourceToFxChain(source) {
+  buildFxChain();
+  source.disconnect();
+  source.connect(fxDistortion);
+  // Apply current slider values
+  const vals = getEffectValues();
+  Object.entries(vals).forEach(([fx, v]) => applyFxValue(fx, v));
 }
 
 function resetEffects() {
   document.querySelectorAll('#inspector-panel .effect-slider').forEach(slider => {
     const fx = slider.dataset.fx;
-    slider.value = fx === 'filterLP' ? 100 : 0;
-    slider.nextElementSibling.textContent = slider.value + '%';
+    const def = fx === 'filterLP' ? 100 : 0;
+    slider.value = def;
+    slider.nextElementSibling.textContent = def + '%';
+    if (fxChainConnected) applyFxValue(fx, def);
   });
   showToast('Effects reset');
 }
@@ -1636,12 +2259,79 @@ function resetEffects() {
 function applyEffects() {
   const s = samples[state.inspectedSample];
   if (!s) return;
-  document.querySelectorAll('#inspector-panel .effect-slider').forEach(slider => {
-    const fx = slider.dataset.fx;
-    if (fx) s.effects[fx] = parseInt(slider.value);
+  const vals = getEffectValues();
+  // Save effect values
+  Object.entries(vals).forEach(([fx, v]) => { if (fx) s.effects[fx] = v; });
+
+  // Offline render with effects
+  ensureAudioContext();
+  getAudioBuffer(state.inspectedSample).then(srcBuf => {
+    if (!srcBuf) { saveData(); showToast('Effects saved!'); return; }
+    const hasEffects = vals.distortion > 0 || vals.reverb > 0 || vals.delay > 0 || vals.filterLP < 100 || vals.bitcrush > 0 || vals.saturation > 0;
+    if (!hasEffects) { saveData(); showToast('Effects saved!'); return; }
+
+    const offCtx = new OfflineAudioContext(srcBuf.numberOfChannels, srcBuf.length + audioCtx.sampleRate, srcBuf.sampleRate);
+    const src = offCtx.createBufferSource();
+    src.buffer = srcBuf;
+
+    // Build offline effects chain
+    const dist = offCtx.createWaveShaper();
+    dist.oversample = '4x';
+    const k = (vals.distortion / 100) * 4;
+    if (k > 0) {
+      const curve = new Float32Array(44100);
+      for (let i = 0; i < 44100; i++) {
+        const x = (i * 2) / 44100 - 1;
+        curve[i] = ((3 + k) * x * 20 * (Math.PI / 180)) / (Math.PI + k * Math.abs(x));
+      }
+      dist.curve = curve;
+    }
+
+    const sat = offCtx.createWaveShaper();
+    if (vals.saturation > 0) {
+      const sCurve = new Float32Array(44100);
+      const sk = (vals.saturation / 100) * 2;
+      for (let i = 0; i < 44100; i++) {
+        const x = (i * 2) / 44100 - 1;
+        sCurve[i] = Math.tanh(x * (1 + sk));
+      }
+      sat.curve = sCurve;
+    }
+
+    const filt = offCtx.createBiquadFilter();
+    filt.type = 'lowpass';
+    filt.frequency.value = 200 + (vals.filterLP / 100) * 19800;
+    filt.Q.value = 0.7;
+
+    const del = offCtx.createDelay(1.0);
+    del.delayTime.value = vals.delay > 0 ? 0.15 + (vals.delay / 100) * 0.35 : 0;
+    const delGain = offCtx.createGain();
+    delGain.gain.value = vals.delay > 0 ? 0.2 + (vals.delay / 100) * 0.4 : 0;
+
+    src.connect(dist);
+    dist.connect(sat);
+    sat.connect(filt);
+    filt.connect(offCtx.destination);
+
+    if (vals.delay > 0) {
+      filt.connect(del);
+      del.connect(delGain);
+      delGain.connect(offCtx.destination);
+      delGain.connect(del);
+    }
+
+    src.start(0);
+    offCtx.startRendering().then(renderedBuf => {
+      // Trim to original length
+      const trimmed = audioCtx.createBuffer(renderedBuf.numberOfChannels, srcBuf.length, srcBuf.sampleRate);
+      for (let ch = 0; ch < renderedBuf.numberOfChannels; ch++) {
+        trimmed.copyToChannel(renderedBuf.getChannelData(ch).slice(0, srcBuf.length), ch);
+      }
+      cacheAndPersistBuffer(state.inspectedSample, trimmed);
+      saveData();
+      showToast('Effects applied & saved!');
+    });
   });
-  saveData();
-  showToast('Effects saved!');
 }
 
 function updateSampleNotes() {
@@ -1816,14 +2506,104 @@ function updateBatchBar() {
   }
 }
 
+function audioBufferToWav(buffer) {
+  const numChannels = buffer.numberOfChannels;
+  const sampleRate = buffer.sampleRate;
+  const format = 1; // PCM
+  const bitDepth = 16;
+  const bytesPerSample = bitDepth / 8;
+  const blockAlign = numChannels * bytesPerSample;
+  const dataLength = buffer.length * blockAlign;
+  const headerLength = 44;
+  const totalLength = headerLength + dataLength;
+  const arrayBuffer = new ArrayBuffer(totalLength);
+  const view = new DataView(arrayBuffer);
+
+  function writeString(offset, str) {
+    for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+  }
+
+  writeString(0, 'RIFF');
+  view.setUint32(4, totalLength - 8, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, format, true);
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * blockAlign, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitDepth, true);
+  writeString(36, 'data');
+  view.setUint32(40, dataLength, true);
+
+  const channels = [];
+  for (let ch = 0; ch < numChannels; ch++) channels.push(buffer.getChannelData(ch));
+
+  let offset = 44;
+  for (let i = 0; i < buffer.length; i++) {
+    for (let ch = 0; ch < numChannels; ch++) {
+      const sample = Math.max(-1, Math.min(1, channels[ch][i]));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+      offset += 2;
+    }
+  }
+  return arrayBuffer;
+}
+
+function sanitizeFilename(name) {
+  return name.replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_');
+}
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function downloadSample(id) {
-  showToast('Downloading ' + (samples[id]?.name || 'sample') + '...');
+  const s = samples[id];
+  if (!s) return;
+  ensureAudioContext();
+  showToast('Preparing download...');
+  getAudioBuffer(id).then(buf => {
+    if (!buf) { showToast('No audio to download'); return; }
+    const wav = audioBufferToWav(buf);
+    const blob = new Blob([wav], { type: 'audio/wav' });
+    triggerDownload(blob, sanitizeFilename(s.name) + '.wav');
+    showToast('Downloaded ' + s.name + '.wav');
+  });
 }
 
 function downloadSelectedAsZip() {
   if (state.selectedSamples.size === 0) return;
+  ensureAudioContext();
   showToast(`Preparing ZIP with ${state.selectedSamples.size} samples...`);
-  setTimeout(() => showToast('ZIP downloaded!'), 1500);
+  const zip = new JSZip();
+  const promises = [];
+  state.selectedSamples.forEach(id => {
+    const s = samples[id];
+    if (!s) return;
+    promises.push(
+      getAudioBuffer(id).then(buf => {
+        if (!buf) return;
+        const wav = audioBufferToWav(buf);
+        zip.file(sanitizeFilename(s.name) + '.wav', wav);
+      })
+    );
+  });
+  Promise.all(promises).then(() => {
+    return zip.generateAsync({ type: 'blob' });
+  }).then(blob => {
+    const projName = projects[currentProjectId]?.name || 'FIIRE';
+    triggerDownload(blob, sanitizeFilename(projName) + '_samples.zip');
+    showToast('ZIP downloaded!');
+  });
 }
 
 function favoriteSelected() {
@@ -1843,9 +2623,11 @@ function deleteSampleConfirm(id) {
 
 function deleteSample(id) {
   delete samples[id];
+  delete audioBuffers[id];
+  deleteAudioBlob(id);
   state.selectedSamples.delete(id);
   saveData();
-  if (state.currentSample === id) { state.currentSample = null; document.getElementById('player-bar').style.display = 'none'; }
+  if (state.currentSample === id) { state.currentSample = null; stopCurrentSource(); document.getElementById('player-bar').style.display = 'none'; }
   if (state.inspectedSample === id) closeInspector();
   renderLibrary();
   showToast('Sample deleted');
@@ -1856,7 +2638,7 @@ function deleteSelected() {
   document.getElementById('confirm-title').textContent = 'Delete Samples';
   document.getElementById('confirm-msg').textContent = `Delete ${state.selectedSamples.size} selected samples?`;
   document.getElementById('confirm-action').onclick = () => {
-    state.selectedSamples.forEach(id => delete samples[id]);
+    state.selectedSamples.forEach(id => { delete samples[id]; delete audioBuffers[id]; deleteAudioBlob(id); });
     state.selectedSamples.clear();
     saveData(); closeModal(); renderLibrary(); showToast('Samples deleted');
   };
@@ -2053,7 +2835,7 @@ function renderRecommendations() {
   const bpms = accepted.filter(s => s.bpm).map(s => s.bpm);
   const avgBpm = bpms.length ? Math.round(bpms.reduce((a, b) => a + b, 0) / bpms.length) : 120;
   const keys = accepted.filter(s => s.key).map(s => s.key);
-  const topKey = keys.length ? mode(keys) : 'C';
+  const topKey = keys.length ? (() => { const freq = {}; keys.forEach(v => freq[v] = (freq[v] || 0) + 1); return Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0]; })() : 'C';
 
   document.getElementById('dash-rec-list').innerHTML = `
     <div class="bg-panel border border-border rounded-xl p-4 flex items-center gap-4 cursor-pointer hover:border-brand transition-colors" onclick="navigateTo('generate')">
@@ -2065,11 +2847,6 @@ function renderRecommendations() {
         <p class="text-xs text-txt-muted">Based on your most accepted samples</p>
       </div>
     </div>`;
-}
-
-function mode(arr) {
-  const freq = {}; arr.forEach(v => freq[v] = (freq[v] || 0) + 1);
-  return Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0];
 }
 
 let dashTypeFilter = 'all';
@@ -2085,12 +2862,24 @@ function setDashTypeFilter(type, btn) {
 function handleDragStart(event, id) {
   const s = samples[id];
   if (!s) return;
-  event.dataTransfer.setData('text/plain', s.name + '.wav');
   event.dataTransfer.effectAllowed = 'copy';
-  // For DAW integration, set DownloadURL
-  try {
-    event.dataTransfer.setData('DownloadURL', `audio/wav:${s.name}.wav:${window.location.href}`);
-  } catch(e) {}
+  const filename = sanitizeFilename(s.name) + '.wav';
+  event.dataTransfer.setData('text/plain', filename);
+
+  // Build a real WAV blob for DAW drag-and-drop
+  ensureAudioContext();
+  const buf = audioBuffers[id];
+  if (buf) {
+    const wav = audioBufferToWav(buf);
+    const blob = new Blob([wav], { type: 'audio/wav' });
+    const url = URL.createObjectURL(blob);
+    try {
+      event.dataTransfer.setData('DownloadURL', `audio/wav:${filename}:${url}`);
+    } catch(e) {}
+    // Clean up object URL after drag completes
+    const cleanup = () => { URL.revokeObjectURL(url); document.removeEventListener('dragend', cleanup); };
+    document.addEventListener('dragend', cleanup);
+  }
 }
 
 // ==================== IMPORT FROM PROJECT ====================
@@ -2172,12 +2961,186 @@ function importSelectedSamples() {
   showToast(`${count} sample${count !== 1 ? 's' : ''} imported!`);
 }
 
+// ==================== SETTINGS ====================
+function openSettingsModal() {
+  const input = document.getElementById('settings-api-key');
+  input.value = ELEVENLABS_API_KEY;
+  input.type = 'password';
+  document.getElementById('api-key-eye').textContent = 'visibility_off';
+  document.getElementById('api-status').innerHTML = ELEVENLABS_API_KEY
+    ? '<span class="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0"></span><span class="text-xs text-emerald-400 font-medium">Key saved</span>'
+    : '<span class="w-2 h-2 rounded-full bg-txt-dim flex-shrink-0"></span><span class="text-xs text-txt-dim font-medium">No key set</span>';
+  document.getElementById('settings-modal').classList.add('open');
+}
+
+function closeSettingsModal() {
+  document.getElementById('settings-modal').classList.remove('open');
+}
+
+function toggleApiKeyVisibility() {
+  const input = document.getElementById('settings-api-key');
+  const eye = document.getElementById('api-key-eye');
+  if (input.type === 'password') {
+    input.type = 'text';
+    eye.textContent = 'visibility';
+  } else {
+    input.type = 'password';
+    eye.textContent = 'visibility_off';
+  }
+}
+
+function saveApiKey() {
+  const key = document.getElementById('settings-api-key').value.trim();
+  ELEVENLABS_API_KEY = key;
+  localStorage.setItem('fiire_api_key', key);
+  document.getElementById('api-status').innerHTML = key
+    ? '<span class="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0"></span><span class="text-xs text-emerald-400 font-medium">Key saved</span>'
+    : '<span class="w-2 h-2 rounded-full bg-txt-dim flex-shrink-0"></span><span class="text-xs text-txt-dim font-medium">Key removed</span>';
+  showToast(key ? 'API key saved' : 'API key removed');
+}
+
+function testApiKey() {
+  const key = document.getElementById('settings-api-key').value.trim();
+  if (!key) {
+    document.getElementById('api-status').innerHTML = '<span class="w-2 h-2 rounded-full bg-red-400 flex-shrink-0"></span><span class="text-xs text-red-400 font-medium">Enter a key first</span>';
+    return;
+  }
+
+  const btn = document.getElementById('api-test-btn');
+  const label = document.getElementById('api-test-label');
+  btn.disabled = true;
+  label.textContent = 'Testing...';
+
+  // Test with a minimal SFX generation request
+  fetch('https://api.elevenlabs.io/v1/sound-generation?output_format=mp3_22050_32', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'xi-api-key': key },
+    body: JSON.stringify({
+      text: 'short click',
+      duration_seconds: 0.5,
+      prompt_influence: 0.3,
+      model_id: 'eleven_text_to_sound_v2',
+    }),
+  }).then(res => {
+    if (res.ok) {
+      document.getElementById('api-status').innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0"></span><span class="text-xs text-emerald-400 font-medium">Connected!</span>';
+      showToast('API key is valid!');
+    } else {
+      return res.text().then(t => {
+        let msg = 'Invalid key';
+        try { const j = JSON.parse(t); msg = j.detail?.message || j.detail || msg; } catch(e) {}
+        document.getElementById('api-status').innerHTML = `<span class="w-2 h-2 rounded-full bg-red-400 flex-shrink-0"></span><span class="text-xs text-red-400 font-medium">${msg}</span>`;
+        showToast('API key test failed');
+      });
+    }
+  }).catch(err => {
+    document.getElementById('api-status').innerHTML = '<span class="w-2 h-2 rounded-full bg-red-400 flex-shrink-0"></span><span class="text-xs text-red-400 font-medium">Network error</span>';
+    showToast('Connection failed');
+  }).finally(() => {
+    btn.disabled = false;
+    label.textContent = 'Test Connection';
+  });
+}
+
+function clearAllDataConfirm() {
+  closeSettingsModal();
+  document.getElementById('confirm-title').textContent = 'Clear All Data';
+  document.getElementById('confirm-msg').textContent = 'This will delete all samples, projects, and cached audio. This cannot be undone.';
+  document.getElementById('confirm-action').onclick = () => {
+    localStorage.removeItem('fiire_samples');
+    localStorage.removeItem('fiire_sessions');
+    localStorage.removeItem('fiire_decisions');
+    localStorage.removeItem('fiire_counters');
+    localStorage.removeItem('fiire_projects');
+    localStorage.removeItem('fiire_current_project');
+    // Clear IndexedDB
+    try { indexedDB.deleteDatabase(AUDIO_DB_NAME); } catch(e) {}
+    closeModal();
+    showToast('All data cleared — reloading...');
+    setTimeout(() => location.reload(), 1000);
+  };
+  document.getElementById('confirm-modal').classList.add('open');
+}
+
 // ==================== KEYBOARD SHORTCUTS ====================
+function getNavigableSamples() {
+  return Object.values(samples)
+    .filter(s => s.projectId === currentProjectId)
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+function navigateSample(direction) {
+  const list = getNavigableSamples();
+  if (!list.length) return;
+  if (!state.currentSample) { previewSample(list[0].id); return; }
+  const idx = list.findIndex(s => s.id === state.currentSample);
+  const next = idx + direction;
+  if (next >= 0 && next < list.length) previewSample(list[next].id);
+}
+
+let shortcutOverlayOpen = false;
+function toggleShortcutOverlay() {
+  shortcutOverlayOpen = !shortcutOverlayOpen;
+  let overlay = document.getElementById('shortcut-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'shortcut-overlay';
+    overlay.className = 'modal-overlay';
+    overlay.onclick = (e) => { if (e.target === overlay) { overlay.classList.remove('open'); shortcutOverlayOpen = false; } };
+    overlay.innerHTML = `
+      <div class="bg-panel border border-border rounded-2xl p-6 w-full max-w-sm animate-fadeIn">
+        <h3 class="text-lg font-bold mb-4">Keyboard Shortcuts</h3>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between"><span class="text-txt-muted">Play / Pause</span><kbd class="px-2 py-0.5 bg-surface border border-border rounded text-xs font-mono">Space</kbd></div>
+          <div class="flex justify-between"><span class="text-txt-muted">Previous sample</span><kbd class="px-2 py-0.5 bg-surface border border-border rounded text-xs font-mono">&larr;</kbd></div>
+          <div class="flex justify-between"><span class="text-txt-muted">Next sample</span><kbd class="px-2 py-0.5 bg-surface border border-border rounded text-xs font-mono">&rarr;</kbd></div>
+          <div class="flex justify-between"><span class="text-txt-muted">Accept sample</span><kbd class="px-2 py-0.5 bg-surface border border-border rounded text-xs font-mono">A</kbd></div>
+          <div class="flex justify-between"><span class="text-txt-muted">Reject sample</span><kbd class="px-2 py-0.5 bg-surface border border-border rounded text-xs font-mono">R</kbd></div>
+          <div class="flex justify-between"><span class="text-txt-muted">Toggle favorite</span><kbd class="px-2 py-0.5 bg-surface border border-border rounded text-xs font-mono">F</kbd></div>
+          <div class="flex justify-between"><span class="text-txt-muted">Download sample</span><kbd class="px-2 py-0.5 bg-surface border border-border rounded text-xs font-mono">D</kbd></div>
+          <div class="flex justify-between"><span class="text-txt-muted">Toggle loop</span><kbd class="px-2 py-0.5 bg-surface border border-border rounded text-xs font-mono">L</kbd></div>
+          <div class="flex justify-between"><span class="text-txt-muted">Show shortcuts</span><kbd class="px-2 py-0.5 bg-surface border border-border rounded text-xs font-mono">?</kbd></div>
+        </div>
+        <button class="mt-4 text-sm text-txt-dim hover:text-txt" onclick="this.closest('.modal-overlay').classList.remove('open'); shortcutOverlayOpen=false;">Close</button>
+      </div>`;
+    document.body.appendChild(overlay);
+  }
+  overlay.classList.toggle('open', shortcutOverlayOpen);
+}
+
 document.addEventListener('keydown', e => {
-  if (e.code === 'Escape') { closeModal(); return; }
+  if (e.code === 'Escape') { closeModal(); if (shortcutOverlayOpen) toggleShortcutOverlay(); return; }
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
-  if (e.code === 'Space' && state.currentSample) { e.preventDefault(); togglePlayPause(); }
-  if (e.code === 'KeyL') toggleLoopPlayback();
+
+  switch (e.code) {
+    case 'Space':
+      if (state.currentSample) { e.preventDefault(); togglePlayPause(); }
+      break;
+    case 'ArrowRight':
+      e.preventDefault(); navigateSample(1);
+      break;
+    case 'ArrowLeft':
+      e.preventDefault(); navigateSample(-1);
+      break;
+    case 'KeyA':
+      if (state.currentSample && samples[state.currentSample]?.status === 'pending') acceptVariation(state.currentSample);
+      break;
+    case 'KeyR':
+      if (state.currentSample && samples[state.currentSample]?.status === 'pending') rejectVariation(state.currentSample);
+      break;
+    case 'KeyF':
+      if (state.currentSample) toggleSampleFavorite(state.currentSample);
+      break;
+    case 'KeyD':
+      if (state.currentSample) downloadSample(state.currentSample);
+      break;
+    case 'KeyL':
+      toggleLoopPlayback();
+      break;
+    case 'Slash':
+      if (e.shiftKey) { e.preventDefault(); toggleShortcutOverlay(); }
+      break;
+  }
 });
 
 // ==================== SEED DATA ====================
@@ -2220,14 +3183,14 @@ function seedDemoData() {
       effects: { distortion: 0, reverb: 0, delay: 0, filterLP: 100, bitcrush: 0, saturation: 0 },
       generationSessionId: d.session,
       variationIndex: i, parentSampleId: null,
-      modelVersion: 'Sonic v3.5',
+      modelVersion: 'ElevenLabs SFX v2',
       createdAt: ts,
       acceptedAt: d.status === 'accepted' ? ts + 1000 : null,
       favoritedAt: d.fav ? ts + 2000 : null,
       isFavorite: !!d.fav,
       isInLibrary: d.status === 'accepted',
       rejectionFeedback: d.feedback || null,
-      waveformData: generateWaveformData(60 + Math.floor(Math.random() * 40)),
+      waveformData: placeholderWaveform(80),
       projectId: 'proj_default',
     };
     if (!sessionMap[d.session]) sessionMap[d.session] = [];
@@ -2240,19 +3203,19 @@ function seedDemoData() {
   // Create sessions
   sessions[sessionId] = {
     id: sessionId, type: 'loop',
-    params: { type: 'loop', bpm: 90, key: 'Cm', bars: 4, styles: ['Dusty', 'Lo-fi'], varCount: 6, model: 'Sonic v3.5' },
+    params: { type: 'loop', bpm: 90, key: 'Cm', bars: 4, styles: ['Dusty', 'Lo-fi'], varCount: 6, model: 'ElevenLabs SFX v2' },
     variationIds: sessionMap[sessionId] || [], acceptedCount: 2, rejectedCount: 1,
     createdAt: Date.now() - 900000, projectId: 'proj_default',
   };
   sessions[sessionId2] = {
     id: sessionId2, type: 'loop',
-    params: { type: 'loop', bpm: 120, key: 'C', bars: 2, styles: ['Crispy', 'Digital'], varCount: 4, model: 'Sonic v3.5' },
+    params: { type: 'loop', bpm: 120, key: 'C', bars: 2, styles: ['Crispy', 'Digital'], varCount: 4, model: 'ElevenLabs SFX v2' },
     variationIds: sessionMap[sessionId2] || [], acceptedCount: 3, rejectedCount: 1,
     createdAt: Date.now() - 600000, projectId: 'proj_default',
   };
   sessions[sessionId3] = {
     id: sessionId3, type: 'oneshot',
-    params: { type: 'oneshot', tuning: 'C4', attack: 'Snappy', timbre: 'Warm', styles: ['Analog', 'Punchy'], varCount: 5, model: 'Sonic v3.5' },
+    params: { type: 'oneshot', tuning: 'C4', attack: 'Snappy', timbre: 'Warm', styles: ['Analog', 'Punchy'], varCount: 5, model: 'ElevenLabs SFX v2' },
     variationIds: sessionMap[sessionId3] || [], acceptedCount: 3, rejectedCount: 0,
     createdAt: Date.now() - 300000, projectId: 'proj_default',
   };
@@ -2266,6 +3229,16 @@ seedDemoData();
 migrateToProjects();
 renderProjectSwitcher();
 navigateTo('dashboard');
+
+// Pre-generate audio + real waveforms on first user interaction
+document.addEventListener('click', function initAudioOnGesture() {
+  document.removeEventListener('click', initAudioOnGesture);
+  ensureAudioContext();
+  // Generate buffers + real waveforms for all existing samples in background
+  Object.keys(samples).forEach((sid, i) => {
+    setTimeout(() => getAudioBuffer(sid), i * 50); // stagger to avoid blocking
+  });
+}, { once: true });
 </script>
 </body>
 </html>
