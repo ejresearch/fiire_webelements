@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FIIRE - Sound DNA</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        "brand": "#E85002",
+        "brand-hover": "#F16001",
+        "bg": "#1A1A1A",
+        "panel": "#232323",
+        "surface": "#2D2D2D",
+        "surface-hi": "#3D3D3D",
+        "border": "#3D3D3D",
+        "border-light": "#4A4A4A",
+        "txt": "#D4D4D4",
+        "txt-muted": "#999999",
+        "txt-dim": "#666666",
+        "dk-gray": "#3D3D3D",
+      },
+      fontFamily: {
+        "display": ["Space Grotesk", "system-ui", "sans-serif"],
+        "mono": ["'SF Mono'", "'Consolas'", "monospace"],
+      },
+      fontSize: {
+        "xxs": ["10px", { lineHeight: "14px" }],
+        "micro": ["9px", { lineHeight: "12px" }],
+      },
+    },
+  },
+}
+</script>
+<link rel="stylesheet" href="css/shared.css"/>
+</head>
+<body class="antialiased">
+<div class="flex h-screen overflow-hidden">
+
+<!-- ==================== SIDEBAR ==================== -->
+<aside class="w-[200px] flex-shrink-0 border-r border-border flex flex-col bg-panel z-10">
+  <a href="home.html" class="px-3 py-2 flex items-center cursor-pointer">
+    <img src="logo.png" alt="FIIRE" class="h-12 w-auto" />
+  </a>
+
+  <!-- Project Switcher -->
+  <div class="px-2 pb-2 relative">
+    <button id="project-switcher" class="w-full flex items-center gap-2 px-2 py-1.5 bg-surface border border-border hover:border-border-light transition-colors text-left" onclick="toggleProjectDropdown()">
+      <div class="w-5 h-5 bg-brand/10 flex items-center justify-center flex-shrink-0">
+        <span class="material-symbols-outlined text-brand text-[12px]">folder</span>
+      </div>
+      <div class="flex-1 min-w-0">
+        <p id="project-name" class="text-[11px] font-bold truncate">My Project</p>
+        <p id="project-count" class="text-[9px] text-txt-dim">0 samples</p>
+      </div>
+      <span class="material-symbols-outlined text-txt-dim text-[14px] flex-shrink-0" id="project-chevron">expand_more</span>
+    </button>
+    <div id="project-dropdown" class="hidden absolute left-2 right-2 top-full mt-1 bg-panel border border-border z-50 overflow-hidden">
+      <div class="max-h-64 overflow-y-auto py-1" id="project-list"></div>
+      <div class="border-t border-border p-1.5">
+        <div id="new-project-row" class="flex items-center gap-1">
+          <button class="flex-1 flex items-center gap-1.5 px-2 py-1 text-[11px] text-brand hover:bg-surface transition-colors font-medium" onclick="showNewProjectInput()">
+            <span class="material-symbols-outlined text-[14px]">add</span> New Project
+          </button>
+        </div>
+        <div id="new-project-input-row" class="hidden flex items-center gap-1">
+          <input id="new-project-input" class="flex-1 bg-bg border border-border px-2 py-1 text-[11px] text-txt placeholder:text-txt-dim" placeholder="Project name..." onkeydown="if(event.key==='Enter')confirmNewProject(); if(event.key==='Escape')cancelNewProject();" />
+          <button class="p-1 text-emerald-400 hover:bg-surface" onclick="confirmNewProject()">
+            <span class="material-symbols-outlined text-[14px]">check</span>
+          </button>
+          <button class="p-1 text-txt-dim hover:bg-surface" onclick="cancelNewProject()">
+            <span class="material-symbols-outlined text-[14px]">close</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <nav class="flex-1 px-2 py-1 flex flex-col gap-0">
+    <a href="home.html" class="nav-link flex items-center gap-2 px-2 py-1" data-page="home">
+      <span class="material-symbols-outlined text-[16px]">home</span>
+      <span class="text-[11px] font-medium uppercase tracking-wide">Home</span>
+    </a>
+    <a href="sounddna.html" class="nav-link flex items-center gap-2 px-2 py-1" data-page="sounddna">
+      <span class="material-symbols-outlined text-[16px]">fingerprint</span>
+      <span class="text-[11px] font-medium uppercase tracking-wide">Sound DNA</span>
+    </a>
+    <a href="studio.html" class="nav-link flex items-center gap-2 px-2 py-1" data-page="studio">
+      <span class="material-symbols-outlined text-[16px]">music_note</span>
+      <span class="text-[11px] font-medium uppercase tracking-wide">Studio</span>
+    </a>
+  </nav>
+  <div class="p-2 border-t border-border space-y-1">
+    <a href="studio.html" class="w-full flex items-center justify-center gap-1 py-1.5 bg-brand hover:bg-brand-hover text-txt font-bold text-[11px] uppercase transition-all">
+      <span class="material-symbols-outlined text-[14px]">add</span>
+      New Session
+    </a>
+    <button onclick="openSettingsModal()" class="w-full flex items-center gap-2 px-2 py-1 text-txt-muted hover:text-txt hover:bg-surface transition-colors">
+      <span class="material-symbols-outlined text-[14px]">settings</span>
+      <span class="text-[11px]">Settings</span>
+    </button>
+  </div>
+</aside>
+
+<!-- ==================== MAIN CONTENT ==================== -->
+<div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+<!-- Sound DNA page -->
+<div class="flex flex-col flex-1 overflow-hidden">
+  <!-- Scope tab bar -->
+  <div class="flex border-b border-border bg-panel px-3 flex-shrink-0">
+    <button id="dna-tab-global" class="px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider border-b-2 text-brand border-brand transition-colors" onclick="switchDnaScope('global')">Global DNA</button>
+    <button id="dna-tab-project" class="px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider border-b-2 text-txt-dim border-transparent hover:text-txt-muted transition-colors" onclick="switchDnaScope('project')">Project DNA</button>
+  </div>
+
+  <header class="px-8 pt-6 pb-4">
+    <div class="flex items-center gap-3">
+      <span class="material-symbols-outlined text-brand text-3xl">fingerprint</span>
+      <div>
+        <h2 id="dna-page-title" class="text-3xl font-black tracking-tight">Global Sound DNA</h2>
+        <p id="dna-page-subtitle" class="text-txt-muted text-sm">Upload your tracks to discover your overall sonic identity across all projects.</p>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex-1 overflow-y-auto px-8 pb-28">
+    <!-- STEP 1: Upload Zone -->
+    <div id="dna-upload-section" class="mb-8">
+      <h3 class="text-lg font-bold mb-3">1. Upload Your Tracks</h3>
+      <p class="text-sm text-txt-muted mb-4">Drop 2–10 tracks (WAV or MP3) that represent your sound. More tracks = better profile.</p>
+
+      <div id="dna-drop-zone" class="border-2 border-dashed border-border rounded p-12 text-center hover:border-brand transition-colors cursor-pointer relative"
+           onclick="document.getElementById('dna-file-input').click()">
+        <input id="dna-file-input" type="file" accept="audio/wav,audio/mp3,audio/mpeg,audio/x-wav" multiple class="hidden" onchange="handleDnaFileSelect(this)"/>
+        <span class="material-symbols-outlined text-5xl text-txt-dim mb-3 block">cloud_upload</span>
+        <p class="text-txt-muted font-medium text-lg">Drop tracks here or click to browse</p>
+        <p class="text-txt-dim text-sm mt-1">WAV or MP3, up to 10 files</p>
+      </div>
+
+      <div id="dna-track-list" class="hidden mt-4 space-y-2"></div>
+      <div id="dna-track-actions" class="hidden mt-3 flex items-center justify-between">
+        <span class="text-sm text-txt-muted"><span id="dna-track-count">0</span> tracks loaded</span>
+        <div class="flex gap-3">
+          <button class="text-sm text-red-400 hover:text-red-300" onclick="clearDnaTracks()">Clear All</button>
+          <button id="dna-analyze-btn" class="bg-brand hover:bg-brand-hover text-txt font-bold px-6 py-2.5 rounded flex items-center gap-2 text-sm transition-all"
+                  onclick="analyzeDnaTracks()">
+            <span class="material-symbols-outlined text-[18px]">analytics</span> Analyze My Sound
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2: Analysis Progress -->
+    <div id="dna-analysis-section" class="hidden mb-8">
+      <h3 class="text-lg font-bold mb-3">2. Analyzing Your Sound</h3>
+      <div id="dna-progress-container" class="bg-panel border border-border rounded p-6 dna-analyzing">
+        <div id="dna-progress-tracks" class="space-y-3"></div>
+        <div class="mt-4">
+          <div class="flex justify-between text-xs text-txt-muted mb-1">
+            <span id="dna-progress-label">Analyzing...</span>
+            <span id="dna-progress-pct">0%</span>
+          </div>
+          <div class="w-full h-2 bg-bg rounded overflow-hidden">
+            <div id="dna-progress-bar" class="h-full bg-brand rounded transition-all duration-300" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3: Sound Profile Display -->
+    <div id="dna-profile-section" class="hidden mb-8">
+      <h3 class="text-lg font-bold mb-3">3. Your Sound Profile</h3>
+      <div class="bg-panel border border-border rounded p-6">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="w-20 h-20 rounded bg-brand/15 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-brand text-4xl">fingerprint</span>
+          </div>
+          <div>
+            <h4 id="dna-profile-title" class="text-xl font-bold"></h4>
+            <p id="dna-profile-subtitle" class="text-sm text-txt-muted"></p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-6 mb-6">
+          <div id="dna-characteristics" class="space-y-3"></div>
+          <div>
+            <div class="space-y-3">
+              <div class="flex items-center gap-3">
+                <span class="text-xs text-txt-dim uppercase font-bold w-20">BPM Range</span>
+                <span id="dna-bpm" class="text-sm font-bold text-brand"></span>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="text-xs text-txt-dim uppercase font-bold w-20">Key</span>
+                <span id="dna-key" class="text-sm font-bold text-brand"></span>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="text-xs text-txt-dim uppercase font-bold w-20">Energy</span>
+                <span id="dna-energy" class="text-sm font-bold text-brand"></span>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="text-xs text-txt-dim uppercase font-bold w-20">Texture</span>
+                <span id="dna-texture" class="text-sm font-bold text-brand"></span>
+              </div>
+            </div>
+            <div class="mt-4">
+              <span class="text-[10px] text-txt-dim uppercase font-bold tracking-wider">Descriptors</span>
+              <div id="dna-tags" class="flex flex-wrap gap-1.5 mt-2"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="border-t border-border pt-4 flex items-center justify-between">
+          <div>
+            <p class="text-sm font-bold">Generate your personalized sample pack</p>
+            <p class="text-xs text-txt-muted">16 samples across drums, bass, melodic, and textures</p>
+          </div>
+          <button id="dna-generate-btn" class="bg-brand hover:bg-brand-hover text-txt font-bold px-8 py-3 rounded flex items-center gap-2 text-base transition-all"
+                  onclick="generateDnaPack()">
+            <span class="material-symbols-outlined text-xl">auto_awesome</span> Generate My Pack
+          </button>
+        </div>
+
+        <!-- Pack Results -->
+        <div id="dna-results-section" class="hidden mt-4 border-t border-border pt-4">
+          <h4 class="text-sm font-bold mb-3">Your Sound DNA Pack</h4>
+
+          <div id="dna-gen-loading" class="hidden flex items-center gap-2 py-3">
+            <div class="flex items-end gap-[1px]">
+              <span class="gen-loading-bar"></span><span class="gen-loading-bar"></span><span class="gen-loading-bar"></span>
+              <span class="gen-loading-bar"></span><span class="gen-loading-bar"></span><span class="gen-loading-bar"></span>
+            </div>
+            <div>
+              <p class="text-txt-muted text-[11px]">Generating your personalized pack...</p>
+              <p id="dna-gen-progress" class="text-txt-dim text-[10px]">0 of 16 samples</p>
+            </div>
+          </div>
+
+          <div id="dna-results-grid" class="space-y-4"></div>
+
+          <div id="dna-results-actions" class="hidden mt-4 flex items-center gap-2">
+            <button class="bg-emerald-500/15 text-emerald-400 font-bold px-4 py-1.5 text-[11px] hover:bg-emerald-500/25 transition-colors flex items-center gap-1.5"
+                    onclick="acceptAllDnaSamples()">
+              <span class="material-symbols-outlined text-[14px]">check_circle</span> Accept All to Library
+            </button>
+            <button class="bg-surface border border-border text-txt font-bold px-4 py-1.5 text-[11px] hover:bg-dk-gray transition-colors flex items-center gap-1.5"
+                    onclick="navigateTo('library')">
+              <span class="material-symbols-outlined text-[14px]">library_music</span> Go to Library
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== PLAYER BAR ==================== -->
+<footer id="player-bar" class="fixed bottom-0 left-0 right-0 z-50 glass-effect border-t border-border px-3 py-1" style="display:none;">
+  <div class="flex items-center gap-3">
+    <div class="flex items-center gap-2 w-36 flex-shrink-0">
+      <div class="w-7 h-7 bg-surface overflow-hidden flex-shrink-0">
+        <canvas id="player-mini-waveform" width="28" height="28"></canvas>
+      </div>
+      <div class="min-w-0">
+        <p id="player-title" class="font-bold text-[10px] truncate">Sample</p>
+        <p id="player-meta" class="text-[9px] text-txt-muted truncate">120 BPM / Cm</p>
+      </div>
+    </div>
+    <div class="flex-1 flex items-center gap-2">
+      <button id="btn-play" class="w-7 h-7 bg-brand text-txt flex items-center justify-center hover:bg-brand-hover transition-all flex-shrink-0" onclick="togglePlayPause()">
+        <span class="material-symbols-outlined text-[18px] fill-1">play_arrow</span>
+      </button>
+      <button id="btn-loop" class="text-txt-muted hover:text-txt transition-colors flex-shrink-0" onclick="toggleLoopPlayback()">
+        <span class="material-symbols-outlined text-[14px]">loop</span>
+      </button>
+      <span id="player-current-time" class="text-[9px] font-mono text-txt-dim w-7 text-right flex-shrink-0">0:00</span>
+      <div class="flex-1 h-6 relative cursor-pointer" onclick="seekSample(event)">
+        <canvas id="player-waveform" class="w-full h-full"></canvas>
+      </div>
+      <span id="player-total-time" class="text-[9px] font-mono text-txt-dim w-7 flex-shrink-0">0:00</span>
+    </div>
+    <div class="flex items-center gap-2 flex-shrink-0">
+      <button id="player-fav-btn" class="text-txt-muted hover:text-brand transition-colors" onclick="togglePlayerFav()">
+        <span class="material-symbols-outlined text-[14px]">favorite</span>
+      </button>
+      <button class="text-txt-muted hover:text-txt transition-colors" onclick="downloadSample(state.currentSample)">
+        <span class="material-symbols-outlined text-[14px]">download</span>
+      </button>
+      <div class="flex items-center gap-1">
+        <button onclick="toggleMute()" class="text-txt-muted hover:text-txt"><span id="volume-icon" class="material-symbols-outlined text-[14px]">volume_up</span></button>
+        <input id="volume-slider" type="range" min="0" max="100" value="66" class="w-12 range-slider" oninput="setVolume(this.value)"/>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</div>
+
+<div id="toast" class="toast"></div>
+
+<!-- Confirm modal -->
+<div id="confirm-modal" class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="bg-panel border border-border p-4 w-full max-w-sm animate-fadeIn">
+    <h3 id="confirm-title" class="text-[13px] font-bold mb-1.5"></h3>
+    <p id="confirm-msg" class="text-[11px] text-txt-muted mb-4"></p>
+    <div class="flex gap-2">
+      <button class="flex-1 py-1.5 bg-surface border border-border text-[11px] font-bold hover:bg-dk-gray transition-colors" onclick="closeModal()">Cancel</button>
+      <button id="confirm-action" class="flex-1 py-1.5 bg-red-600 hover:bg-red-500 text-[11px] font-bold text-txt transition-colors">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings modal -->
+<div id="settings-modal" class="modal-overlay" onclick="if(event.target===this)closeSettingsModal()">
+  <div class="bg-panel border border-border w-full max-w-md animate-fadeIn">
+    <div class="p-4 pb-3 border-b border-border flex items-center justify-between">
+      <h3 class="text-[13px] font-bold">Settings</h3>
+      <button class="w-5 h-5 bg-surface hover:bg-dk-gray flex items-center justify-center text-txt-muted hover:text-txt transition-colors" onclick="closeSettingsModal()">
+        <span class="material-symbols-outlined text-[12px]">close</span>
+      </button>
+    </div>
+    <div class="p-4 space-y-4">
+      <div>
+        <label class="section-label block mb-1.5">ELEVENLABS API KEY</label>
+        <p class="text-[10px] text-txt-muted mb-2">Required for AI samples. Get a key at <a href="https://elevenlabs.io/developers" target="_blank" class="text-brand hover:underline">elevenlabs.io</a></p>
+        <div class="flex gap-1.5">
+          <div class="relative flex-1">
+            <input id="settings-api-key" type="password" class="w-full ab-input px-3 py-1.5 pr-8 font-mono" placeholder="xi_..." />
+            <button class="absolute right-1.5 top-1/2 -translate-y-1/2 text-txt-dim hover:text-txt p-0.5" onclick="toggleApiKeyVisibility()">
+              <span class="material-symbols-outlined text-[14px]" id="api-key-eye">visibility_off</span>
+            </button>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5 mt-2">
+          <button id="api-test-btn" class="flex items-center gap-1 bg-surface border border-border text-txt px-3 py-1 text-[10px] font-bold hover:bg-dk-gray transition-colors" onclick="testApiKey()">
+            <span class="material-symbols-outlined text-[12px]">bolt</span>
+            <span id="api-test-label">Test</span>
+          </button>
+          <button class="flex items-center gap-1 bg-brand hover:bg-brand-hover text-txt px-3 py-1 text-[10px] font-bold transition-colors" onclick="saveApiKey()">
+            <span class="material-symbols-outlined text-[12px]">save</span> Save
+          </button>
+          <div id="api-status" class="flex items-center gap-1 ml-auto"></div>
+        </div>
+      </div>
+      <div class="border-t border-border"></div>
+      <div>
+        <label class="section-label block mb-1.5">CLAUDE API KEY</label>
+        <p class="text-[10px] text-txt-muted mb-2">Optional — enables AI prompt refinement. Get a key at <a href="https://console.anthropic.com/" target="_blank" class="text-brand hover:underline">console.anthropic.com</a></p>
+        <div class="flex gap-1.5">
+          <div class="relative flex-1">
+            <input id="settings-claude-key" type="password" class="w-full ab-input px-3 py-1.5 pr-8 font-mono" placeholder="sk-ant-..." />
+            <button class="absolute right-1.5 top-1/2 -translate-y-1/2 text-txt-dim hover:text-txt p-0.5" onclick="toggleClaudeKeyVisibility()">
+              <span class="material-symbols-outlined text-[14px]" id="claude-key-eye">visibility_off</span>
+            </button>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5 mt-2">
+          <button class="flex items-center gap-1 bg-brand hover:bg-brand-hover text-txt px-3 py-1 text-[10px] font-bold transition-colors" onclick="saveClaudeKey()">
+            <span class="material-symbols-outlined text-[12px]">save</span> Save
+          </button>
+          <div id="claude-key-status" class="flex items-center gap-1 ml-auto"></div>
+        </div>
+      </div>
+      <div class="border-t border-border"></div>
+      <div>
+        <label class="section-label block mb-1">DATA</label>
+        <p class="text-[10px] text-txt-muted mb-2">Clear all local data including samples, projects, and audio.</p>
+        <button class="flex items-center gap-1 text-red-400 border border-red-500/30 px-3 py-1 text-[10px] font-bold hover:bg-red-500/10 transition-colors" onclick="clearAllDataConfirm()">
+          <span class="material-symbols-outlined text-[12px]">delete_forever</span> Clear All Data
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+<script src="js/shared.js"></script>
+<script src="js/sounddna.js"></script>
+<script src="js/blaise.js"></script>
+</body>
+</html>
