@@ -602,7 +602,7 @@ function closeInlineGeneration() {
 
 // ==================== TIMELINE RENDERING ====================
 const PIXELS_PER_BEAT_BASE = 40;
-const TRACK_HEIGHT = 60;
+const TRACK_HEIGHT = 44;
 const TRACK_COLORS = ['#E85002', '#3B82F6', '#10B981', '#A855F7', '#F59E0B', '#EC4899', '#06B6D4', '#84CC16'];
 
 function getPixelsPerBeat() {
@@ -665,22 +665,19 @@ function renderTrackHeaders() {
   container.innerHTML = arrangement.tracks.map((track, i) => {
     const colorIdx = i % TRACK_COLORS.length;
     return `<div class="track-header" data-track="${track.id}">
-      <div class="flex items-center gap-1">
-        <div class="w-1.5 h-6 flex-shrink-0" style="background: ${TRACK_COLORS[colorIdx]};"></div>
-        <input class="track-name flex-1 min-w-0" value="${escapeHtml(track.name)}" onchange="renameTrack('${track.id}', this.value)" spellcheck="false"/>
+      <div class="track-row-top">
+        <div class="track-color" style="background:${TRACK_COLORS[colorIdx]}"></div>
+        <input class="track-name" value="${escapeHtml(track.name)}" onchange="renameTrack('${track.id}', this.value)" spellcheck="false"/>
+        <button class="track-ctrl-btn" onclick="deleteTrack('${track.id}')" title="Delete"><span class="material-symbols-outlined text-[9px]">close</span></button>
       </div>
-      <div class="track-controls">
-        <button class="track-ctrl-btn ${recordArmedTrack === track.id ? 'record-armed' : ''}" onclick="toggleRecordArm('${track.id}')" title="Record arm">R</button>
+      <div class="track-row-btm">
+        <button class="track-ctrl-btn ${recordArmedTrack === track.id ? 'record-armed' : ''}" onclick="toggleRecordArm('${track.id}')" title="Arm">R</button>
         <button class="track-ctrl-btn ${track.muted ? 'active-mute' : ''}" onclick="toggleMuteTrack('${track.id}')">M</button>
         <button class="track-ctrl-btn ${track.solo ? 'active-solo' : ''}" onclick="toggleSoloTrack('${track.id}')">S</button>
-        <input type="range" class="track-pan" min="-100" max="100" value="${Math.round((track.pan || 0) * 100)}" oninput="setTrackPan('${track.id}', this.value / 100)" title="Pan"/>
         <input type="range" class="track-vol" min="0" max="100" value="${Math.round(track.volume * 100)}" oninput="setTrackVolume('${track.id}', this.value / 100)"/>
-        <button class="track-ctrl-btn" onclick="openFxPanel('${track.id}')" title="Effects">FX</button>
-        <div class="track-meter"><div class="meter-fill"></div><div class="meter-peak"></div></div>
-        <button class="track-ctrl-btn ml-auto" onclick="deleteTrack('${track.id}')" title="Delete track">
-          <span class="material-symbols-outlined text-[10px]">close</span>
-        </button>
+        <button class="track-ctrl-btn" onclick="openFxPanel('${track.id}')" title="FX">FX</button>
       </div>
+      <div class="track-meter-bar"><div class="meter-fill"></div></div>
     </div>`;
   }).join('');
 }
@@ -1913,7 +1910,6 @@ function updateMeters() {
   if (!state.timelinePlaying) {
     // Decay meters to zero when stopped
     document.querySelectorAll('.meter-fill').forEach(el => el.style.width = '0');
-    document.querySelectorAll('.meter-peak').forEach(el => el.style.left = '0');
     const masterL = document.getElementById('master-meter-l');
     const masterR = document.getElementById('master-meter-r');
     if (masterL) masterL.style.height = '0';
@@ -1927,25 +1923,17 @@ function updateMeters() {
     if (!nodes) return;
     const header = document.querySelector(`.track-header[data-track="${track.id}"]`);
     if (!header) return;
-    const fill = header.querySelector('.meter-fill');
-    const peak = header.querySelector('.meter-peak');
+    const fill = header.querySelector('.track-meter-bar .meter-fill');
     if (!fill) return;
 
     const dataArray = new Float32Array(nodes.analyser.fftSize);
     nodes.analyser.getFloatTimeDomainData(dataArray);
     let rms = 0;
-    let maxVal = 0;
-    for (let i = 0; i < dataArray.length; i++) {
-      rms += dataArray[i] * dataArray[i];
-      const abs = Math.abs(dataArray[i]);
-      if (abs > maxVal) maxVal = abs;
-    }
+    for (let i = 0; i < dataArray.length; i++) rms += dataArray[i] * dataArray[i];
     rms = Math.sqrt(rms / dataArray.length);
-    const dbRMS = Math.max(0, Math.min(100, (20 * Math.log10(rms) + 60) * 100 / 60));
-    const dbPeak = Math.max(0, Math.min(100, (20 * Math.log10(maxVal) + 60) * 100 / 60));
-    fill.style.width = dbRMS + '%';
-    if (peak) peak.style.left = dbPeak + '%';
-    if (dbPeak > 98) fill.classList.add('meter-clip');
+    const db = Math.max(0, Math.min(100, (20 * Math.log10(rms) + 60) * 100 / 60));
+    fill.style.width = db + '%';
+    if (db > 98) fill.classList.add('meter-clip');
     else fill.classList.remove('meter-clip');
   });
 
@@ -2000,6 +1988,9 @@ function renderFxPanel() {
     <div class="fx-header">
       <span class="section-label">FX — ${escapeHtml(track.name)}</span>
       <button onclick="closeFxPanel()" class="text-txt-dim hover:text-txt"><span class="material-symbols-outlined text-[14px]">close</span></button>
+    </div>
+    <div class="fx-section">
+      <label class="fx-row"><span>Pan</span><input type="range" min="-100" max="100" value="${Math.round((track.pan || 0) * 100)}" oninput="setTrackPan('${fxPanelTrackId}', this.value / 100)"/><span class="fx-val">${Math.round((track.pan || 0) * 100)}%</span></label>
     </div>
     <div class="fx-section">
       <div class="fx-section-head">

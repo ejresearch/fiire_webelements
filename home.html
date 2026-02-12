@@ -260,61 +260,65 @@ tailwind.config = {
 
 <!-- Settings modal -->
 <div id="settings-modal" class="modal-overlay" onclick="if(event.target===this)closeSettingsModal()">
-  <div class="bg-panel border border-border w-full max-w-md animate-fadeIn">
-    <div class="p-4 pb-3 border-b border-border flex items-center justify-between">
-      <h3 class="text-[13px] font-bold">Settings</h3>
-      <button class="w-5 h-5 bg-surface hover:bg-dk-gray flex items-center justify-center text-txt-muted hover:text-txt transition-colors" onclick="closeSettingsModal()">
+  <div class="settings-panel animate-fadeIn">
+    <div class="settings-header">
+      <span class="text-[12px] font-bold uppercase tracking-wider">Settings</span>
+      <button class="settings-close" onclick="closeSettingsModal()">
         <span class="material-symbols-outlined text-[12px]">close</span>
       </button>
     </div>
-    <div class="p-4 space-y-4">
-      <div>
-        <label class="section-label block mb-1.5">ELEVENLABS API KEY</label>
-        <p class="text-[10px] text-txt-muted mb-2">Required for AI samples. Get a key at <a href="https://elevenlabs.io/developers" target="_blank" class="text-brand hover:underline">elevenlabs.io</a></p>
-        <div class="flex gap-1.5">
-          <div class="relative flex-1">
-            <input id="settings-api-key" type="password" class="w-full ab-input px-3 py-1.5 pr-8 font-mono" placeholder="xi_..." />
-            <button class="absolute right-1.5 top-1/2 -translate-y-1/2 text-txt-dim hover:text-txt p-0.5" onclick="toggleApiKeyVisibility()">
-              <span class="material-symbols-outlined text-[14px]" id="api-key-eye">visibility_off</span>
-            </button>
-          </div>
-        </div>
-        <div class="flex items-center gap-1.5 mt-2">
-          <button id="api-test-btn" class="flex items-center gap-1 bg-surface border border-border text-txt px-3 py-1 text-[10px] font-bold hover:bg-dk-gray transition-colors" onclick="testApiKey()">
-            <span class="material-symbols-outlined text-[12px]">bolt</span>
-            <span id="api-test-label">Test</span>
-          </button>
-          <button class="flex items-center gap-1 bg-brand hover:bg-brand-hover text-txt px-3 py-1 text-[10px] font-bold transition-colors" onclick="saveApiKey()">
-            <span class="material-symbols-outlined text-[12px]">save</span> Save
-          </button>
-          <div id="api-status" class="flex items-center gap-1 ml-auto"></div>
+    <div class="settings-body">
+      <div class="settings-group">
+        <label class="section-label">DISPLAY NAME</label>
+        <p class="settings-hint">Shown in the greeting on the home page.</p>
+        <div class="flex items-center gap-2">
+          <input id="settings-display-name" type="text" class="settings-input flex-1" placeholder="Your name" />
+          <button class="settings-btn-primary" onclick="saveDisplayName()">Save</button>
         </div>
       </div>
-      <div class="border-t border-border"></div>
-      <div>
-        <label class="section-label block mb-1.5">CLAUDE API KEY</label>
-        <p class="text-[10px] text-txt-muted mb-2">Optional — enables AI prompt refinement. Get a key at <a href="https://console.anthropic.com/" target="_blank" class="text-brand hover:underline">console.anthropic.com</a></p>
-        <div class="flex gap-1.5">
-          <div class="relative flex-1">
-            <input id="settings-claude-key" type="password" class="w-full ab-input px-3 py-1.5 pr-8 font-mono" placeholder="sk-ant-..." />
-            <button class="absolute right-1.5 top-1/2 -translate-y-1/2 text-txt-dim hover:text-txt p-0.5" onclick="toggleClaudeKeyVisibility()">
-              <span class="material-symbols-outlined text-[14px]" id="claude-key-eye">visibility_off</span>
-            </button>
-          </div>
-        </div>
-        <div class="flex items-center gap-1.5 mt-2">
-          <button class="flex items-center gap-1 bg-brand hover:bg-brand-hover text-txt px-3 py-1 text-[10px] font-bold transition-colors" onclick="saveClaudeKey()">
-            <span class="material-symbols-outlined text-[12px]">save</span> Save
+      <div class="settings-group">
+        <label class="section-label">ELEVENLABS API KEY</label>
+        <p class="settings-hint">Required for AI samples. Get a key at <a href="https://elevenlabs.io/developers" target="_blank" class="text-brand hover:underline">elevenlabs.io</a></p>
+        <div class="relative">
+          <input id="settings-api-key" type="password" class="settings-input w-full pr-8 font-mono" placeholder="xi_..." />
+          <button class="absolute right-2 top-1/2 -translate-y-1/2 text-[#666] hover:text-[#999] transition-colors" onclick="toggleApiKeyVisibility()">
+            <span class="material-symbols-outlined text-[13px]" id="api-key-eye">visibility_off</span>
           </button>
-          <div id="claude-key-status" class="flex items-center gap-1 ml-auto"></div>
+        </div>
+        <div class="flex items-center gap-2 mt-2">
+          <button id="api-test-btn" class="settings-btn-secondary" onclick="testApiKey()">
+            <span class="material-symbols-outlined text-[11px]">bolt</span> <span id="api-test-label">Test</span>
+          </button>
+          <button class="settings-btn-primary" onclick="saveApiKey()">Save</button>
+          <div id="api-status" class="flex items-center gap-1 ml-auto text-[10px]"></div>
         </div>
       </div>
-      <div class="border-t border-border"></div>
-      <div>
-        <label class="section-label block mb-1">DATA</label>
-        <p class="text-[10px] text-txt-muted mb-2">Clear all local data including samples, projects, and audio.</p>
-        <button class="flex items-center gap-1 text-red-400 border border-red-500/30 px-3 py-1 text-[10px] font-bold hover:bg-red-500/10 transition-colors" onclick="clearAllDataConfirm()">
-          <span class="material-symbols-outlined text-[12px]">delete_forever</span> Clear All Data
+      <div class="settings-group">
+        <label class="section-label">CLAUDE API KEY</label>
+        <p class="settings-hint">Optional — enables AI prompt refinement. Get a key at <a href="https://console.anthropic.com/" target="_blank" class="text-brand hover:underline">console.anthropic.com</a></p>
+        <div class="relative">
+          <input id="settings-claude-key" type="password" class="settings-input w-full pr-8 font-mono" placeholder="sk-ant-..." />
+          <button class="absolute right-2 top-1/2 -translate-y-1/2 text-[#666] hover:text-[#999] transition-colors" onclick="toggleClaudeKeyVisibility()">
+            <span class="material-symbols-outlined text-[13px]" id="claude-key-eye">visibility_off</span>
+          </button>
+        </div>
+        <div class="flex items-center gap-2 mt-2">
+          <button class="settings-btn-primary" onclick="saveClaudeKey()">Save</button>
+          <div id="claude-key-status" class="flex items-center gap-1 ml-auto text-[10px]"></div>
+        </div>
+      </div>
+      <div class="settings-group">
+        <label class="section-label">LIBRARY</label>
+        <p class="settings-hint">Export all samples in your library as WAV files.</p>
+        <button class="settings-btn-secondary" onclick="exportAllSamples()">
+          <span class="material-symbols-outlined text-[11px]">download</span> Export All
+        </button>
+      </div>
+      <div class="settings-group">
+        <label class="section-label">DATA</label>
+        <p class="settings-hint">Clear all local data including samples, projects, and audio.</p>
+        <button class="settings-btn-danger" onclick="clearAllDataConfirm()">
+          <span class="material-symbols-outlined text-[11px]">delete_forever</span> Clear All Data
         </button>
       </div>
     </div>
