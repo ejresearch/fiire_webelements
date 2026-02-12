@@ -229,18 +229,162 @@ function escapeHtml(str) { const div = document.createElement('div'); div.textCo
 // ==================== AUDIO ENGINE ====================
 let audioCtx = null;
 let masterGain = null;
+let masterAnalyser = null;
+let masterSplitter = null;
+let masterAnalyserL = null;
+let masterAnalyserR = null;
 let currentSource = null;
 let audioBuffers = {};
 let playbackStartTime = 0;
 let playbackOffset = 0;
+const trackNodes = {};
+let reverbIRBuffers = {};
 
 function initAudioContext() {
   if (audioCtx) return audioCtx;
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   masterGain = audioCtx.createGain();
   masterGain.gain.value = state.volume / 100;
-  masterGain.connect(audioCtx.destination);
+
+  // Master analyser for metering
+  masterAnalyser = audioCtx.createAnalyser();
+  masterAnalyser.fftSize = 2048;
+  masterAnalyser.smoothingTimeConstant = 0.8;
+
+  // Stereo split for L/R meters
+  masterSplitter = audioCtx.createChannelSplitter(2);
+  masterAnalyserL = audioCtx.createAnalyser();
+  masterAnalyserL.fftSize = 1024;
+  masterAnalyserR = audioCtx.createAnalyser();
+  masterAnalyserR.fftSize = 1024;
+
+  masterGain.connect(masterAnalyser);
+  masterAnalyser.connect(audioCtx.destination);
+  masterAnalyser.connect(masterSplitter);
+  masterSplitter.connect(masterAnalyserL, 0);
+  masterSplitter.connect(masterAnalyserR, 1);
+
+  // Pre-generate reverb impulse responses
+  reverbIRBuffers.short = generateImpulseResponse(0.8, 2.5);
+  reverbIRBuffers.medium = generateImpulseResponse(1.5, 2.0);
+  reverbIRBuffers.long = generateImpulseResponse(3.0, 1.5);
+
   return audioCtx;
+}
+
+function generateImpulseResponse(duration, decay) {
+  const sr = audioCtx.sampleRate;
+  const length = Math.ceil(sr * duration);
+  const buf = audioCtx.createBuffer(2, length, sr);
+  for (let ch = 0; ch < 2; ch++) {
+    const data = buf.getChannelData(ch);
+    for (let i = 0; i < length; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+    }
+  }
+  return buf;
+}
+
+function ensureTrackNodes(trackId) {
+  if (trackNodes[trackId]) return trackNodes[trackId];
+  ensureAudioContext();
+
+  const track = arrangement.tracks.find(t => t.id === trackId);
+  const fx = track?.effects || { eq: { enabled: false, low: 0, mid: 0, high: 0 }, reverb: { enabled: false, mix: 0.3, decay: 1.5 }, delay: { enabled: false, time: 0.25, feedback: 0.3, mix: 0.2 } };
+
+  // EQ: 3-band
+  const eqLow = audioCtx.createBiquadFilter();
+  eqLow.type = 'lowshelf'; eqLow.frequency.value = 320; eqLow.gain.value = fx.eq.enabled ? fx.eq.low : 0;
+  const eqMid = audioCtx.createBiquadFilter();
+  eqMid.type = 'peaking'; eqMid.frequency.value = 1000; eqMid.Q.value = 0.7; eqMid.gain.value = fx.eq.enabled ? fx.eq.mid : 0;
+  const eqHigh = audioCtx.createBiquadFilter();
+  eqHigh.type = 'highshelf'; eqHigh.frequency.value = 3200; eqHigh.gain.value = fx.eq.enabled ? fx.eq.high : 0;
+
+  // Reverb: convolver with dry/wet
+  const reverbConvolver = audioCtx.createConvolver();
+  const irKey = fx.reverb.decay <= 1.0 ? 'short' : (fx.reverb.decay <= 2.0 ? 'medium' : 'long');
+  reverbConvolver.buffer = reverbIRBuffers[irKey] || reverbIRBuffers.medium;
+  const reverbDry = audioCtx.createGain();
+  reverbDry.gain.value = fx.reverb.enabled ? (1 - fx.reverb.mix) : 1;
+  const reverbWet = audioCtx.createGain();
+  reverbWet.gain.value = fx.reverb.enabled ? fx.reverb.mix : 0;
+
+  // Delay: delay node + feedback loop with dry/wet
+  const delayNode = audioCtx.createDelay(2.0);
+  delayNode.delayTime.value = fx.delay.time || 0.25;
+  const delayFeedback = audioCtx.createGain();
+  delayFeedback.gain.value = fx.delay.enabled ? (fx.delay.feedback || 0.3) : 0;
+  const delayDry = audioCtx.createGain();
+  delayDry.gain.value = fx.delay.enabled ? (1 - (fx.delay.mix || 0.2)) : 1;
+  const delayWet = audioCtx.createGain();
+  delayWet.gain.value = fx.delay.enabled ? (fx.delay.mix || 0.2) : 0;
+
+  // Pan
+  const pan = audioCtx.createStereoPanner();
+  pan.pan.value = track?.pan || 0;
+
+  // Track gain
+  const gain = audioCtx.createGain();
+  gain.gain.value = track?.muted ? 0 : (track?.volume ?? 1);
+
+  // Per-track analyser
+  const analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 1024;
+  analyser.smoothingTimeConstant = 0.8;
+
+  // Input node (entry point for blocks)
+  const input = audioCtx.createGain();
+  input.gain.value = 1;
+
+  // Wire: input → EQ chain → reverb dry/wet → delay dry/wet → pan → gain → analyser → master
+  input.connect(eqLow);
+  eqLow.connect(eqMid);
+  eqMid.connect(eqHigh);
+
+  // EQ → reverb split
+  eqHigh.connect(reverbDry);
+  eqHigh.connect(reverbConvolver);
+  reverbConvolver.connect(reverbWet);
+
+  // Reverb merge → delay split
+  const reverbMerge = audioCtx.createGain();
+  reverbMerge.gain.value = 1;
+  reverbDry.connect(reverbMerge);
+  reverbWet.connect(reverbMerge);
+
+  reverbMerge.connect(delayDry);
+  reverbMerge.connect(delayNode);
+  delayNode.connect(delayFeedback);
+  delayFeedback.connect(delayNode);
+  delayNode.connect(delayWet);
+
+  // Delay merge → pan → gain → analyser → master
+  const delayMerge = audioCtx.createGain();
+  delayMerge.gain.value = 1;
+  delayDry.connect(delayMerge);
+  delayWet.connect(delayMerge);
+
+  delayMerge.connect(pan);
+  pan.connect(gain);
+  gain.connect(analyser);
+  analyser.connect(masterGain);
+
+  trackNodes[trackId] = {
+    input, gain, pan, analyser,
+    eqLow, eqMid, eqHigh,
+    reverbConvolver, reverbDry, reverbWet, reverbMerge,
+    delayNode, delayFeedback, delayDry, delayWet, delayMerge,
+  };
+  return trackNodes[trackId];
+}
+
+function destroyTrackNodes(trackId) {
+  const nodes = trackNodes[trackId];
+  if (!nodes) return;
+  try {
+    Object.values(nodes).forEach(n => { try { n.disconnect(); } catch(e) {} });
+  } catch(e) {}
+  delete trackNodes[trackId];
 }
 
 function ensureAudioContext() {

@@ -1,9 +1,6 @@
 // ==================== FIIRE SOUND DNA JS ====================
 // Sound DNA page: upload, analysis, profile, pack generation
 
-let dnaScope = 'global'; // 'global' or 'project'
-let globalDnaFiles = [];
-let projectDnaFiles = [];
 
 const DNA_PACK_CATEGORIES = [
   { name: 'Drums', icon: 'percussion', count: 4, type: 'loop',
@@ -397,21 +394,12 @@ function buildSoundProfile(analyses) {
 
 function saveDnaProfile() {
   if (!dnaProfile) return;
-  if (dnaScope === 'global') {
-    globalDnaProfile = dnaProfile;
-    localStorage.setItem('fiire_dna_global', JSON.stringify(dnaProfile));
-  } else {
-    if (!currentProjectId) return;
-    localStorage.setItem('fiire_dna_' + currentProjectId, JSON.stringify(dnaProfile));
-  }
+  globalDnaProfile = dnaProfile;
+  localStorage.setItem('fiire_dna_global', JSON.stringify(dnaProfile));
 }
 
 function loadDnaProfile() {
-  if (dnaScope === 'global') {
-    try { return JSON.parse(localStorage.getItem('fiire_dna_global')); } catch(e) { return null; }
-  }
-  if (!currentProjectId) return null;
-  try { return JSON.parse(localStorage.getItem('fiire_dna_' + currentProjectId)); } catch(e) { return null; }
+  try { return JSON.parse(localStorage.getItem('fiire_dna_global')); } catch(e) { return null; }
 }
 
 // ==================== PROFILE RENDERING ====================
@@ -689,12 +677,8 @@ function resetDnaProfileConfirm() {
   document.getElementById('confirm-action').onclick = function() {
     dnaProfile = null;
     dnaFiles = [];
-    if (dnaScope === 'global') {
-      globalDnaProfile = null;
-      localStorage.removeItem('fiire_dna_global');
-    } else if (currentProjectId) {
-      localStorage.removeItem('fiire_dna_' + currentProjectId);
-    }
+    globalDnaProfile = null;
+    localStorage.removeItem('fiire_dna_global');
     document.getElementById('dna-profile-section').classList.add('hidden');
     document.getElementById('dna-results-section').classList.add('hidden');
     document.getElementById('dna-track-list').classList.add('hidden');
@@ -721,44 +705,6 @@ function regenerateDnaLabels() {
   dnaProfile.energyLabel = dnaProfile.energy > 0.7 ? 'High' : dnaProfile.energy > 0.4 ? 'Medium' : 'Low';
   dnaProfile.subtitle = dnaProfile.bpmRange.center + ' BPM / ' + dnaProfile.dominantKey + ' / ' + dnaProfile.trackCount + ' tracks analyzed';
   document.getElementById('dna-profile-subtitle').textContent = dnaProfile.subtitle;
-}
-
-function switchDnaScope(scope) {
-  // Save current files to the right bucket
-  if (dnaScope === 'global') globalDnaFiles = dnaFiles;
-  else projectDnaFiles = dnaFiles;
-
-  dnaScope = scope;
-
-  // Restore files for new scope
-  dnaFiles = scope === 'global' ? globalDnaFiles : projectDnaFiles;
-
-  // Update tabs
-  const tabGlobal = document.getElementById('dna-tab-global');
-  const tabProject = document.getElementById('dna-tab-project');
-  if (scope === 'global') {
-    tabGlobal.className = 'px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider border-b-2 text-brand border-brand transition-colors';
-    tabProject.className = 'px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider border-b-2 text-txt-dim border-transparent hover:text-txt-muted transition-colors';
-  } else {
-    tabProject.className = 'px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider border-b-2 text-brand border-brand transition-colors';
-    tabGlobal.className = 'px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider border-b-2 text-txt-dim border-transparent hover:text-txt-muted transition-colors';
-  }
-
-  // Update header
-  const projName = currentProjectId && projects[currentProjectId] ? projects[currentProjectId].name : 'Project';
-  document.getElementById('dna-page-title').textContent = scope === 'global' ? 'Global Sound DNA' : 'Project DNA: ' + projName;
-  document.getElementById('dna-page-subtitle').textContent = scope === 'global'
-    ? 'Upload your tracks to discover your overall sonic identity across all projects.'
-    : 'Upload tracks specific to this project to build a focused sound profile.';
-
-  // Reset UI and reload profile
-  dnaProfile = null;
-  dnaCategoryResults = [];
-  document.getElementById('dna-profile-section').classList.add('hidden');
-  document.getElementById('dna-analysis-section').classList.add('hidden');
-  document.getElementById('dna-results-section').classList.add('hidden');
-
-  renderSoundDna();
 }
 
 function renderSoundDna() {
@@ -813,10 +759,7 @@ function getDnaPackNumber() {
 }
 
 async function generateDnaPack() {
-  const activeProfile = dnaProfile || (dnaScope === 'project' ? globalDnaProfile : null);
-  if (!activeProfile) { showToast('Analyze tracks first'); return; }
-  // Use active profile for generation
-  dnaProfile = activeProfile;
+  if (!dnaProfile) { showToast('Analyze tracks first'); return; }
   if (state.generating) return;
   if (!ELEVENLABS_API_KEY) { showToast('Set your ElevenLabs API key in Settings first'); return; }
 
@@ -1039,28 +982,9 @@ function renderDnaPreviousPacks() {
   }).join('');
 }
 
-// ==================== PAGE CALLBACKS ====================
-window.FIIRE_onProjectSwitch = function() {
-  // Reset project-scoped data
-  projectDnaFiles = [];
-  dnaCategoryResults = [];
-  if (dnaScope === 'project') {
-    dnaFiles = [];
-    dnaProfile = null;
-    document.getElementById('dna-profile-section').classList.add('hidden');
-    document.getElementById('dna-results-section').classList.add('hidden');
-  }
-  // Re-render with current scope
-  switchDnaScope(dnaScope);
-};
-
 // ==================== INIT ====================
 (function initSoundDna() {
   initNavHighlight();
   renderProjectSwitcher();
-  // Default to global if no global profile yet, otherwise show whichever is missing
-  const hasGlobal = !!localStorage.getItem('fiire_dna_global');
-  const hasProject = currentProjectId && !!localStorage.getItem('fiire_dna_' + currentProjectId);
-  dnaScope = (!hasGlobal) ? 'global' : (!hasProject ? 'project' : 'global');
-  switchDnaScope(dnaScope);
+  renderSoundDna();
 })();

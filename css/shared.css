@@ -84,7 +84,7 @@ aside.w-\[200px\] { transition: margin-left 0.2s ease, opacity 0.2s ease; }
 
 /* Generation loading */
 .gen-loading-bar {
-  width: 2px; height: 16px; border-radius: 1px; background: #E85002;
+  width: 2px; height: 16px; border-radius: 3px; background: #E85002;
   display: inline-block; margin: 0 1px;
   animation: waveformPulse 1.2s ease-in-out infinite;
 }
@@ -154,7 +154,7 @@ aside.w-\[200px\] { transition: margin-left 0.2s ease, opacity 0.2s ease; }
 .track-header .track-controls { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
 .track-ctrl-btn {
   font-size: 9px; font-weight: 700; padding: 1px 4px;
-  background: transparent; border: 1px solid #3D3D3D; border-radius: 2px;
+  background: transparent; border: 1px solid #3D3D3D; border-radius: 3px;
   color: #666; cursor: pointer; transition: all 0.1s;
 }
 .track-ctrl-btn:hover { border-color: #4A4A4A; color: #999; }
@@ -171,7 +171,7 @@ aside.w-\[200px\] { transition: margin-left 0.2s ease, opacity 0.2s ease; }
 .tl-block {
   position: absolute; height: calc(100% - 4px); top: 2px;
   background: rgba(232, 80, 2, 0.12); border: 1px solid rgba(232, 80, 2, 0.35);
-  border-radius: 2px; cursor: grab; transition: border-color 0.1s;
+  border-radius: 3px; cursor: grab; transition: border-color 0.1s;
   display: flex; align-items: center; overflow: hidden;
 }
 .tl-block:hover { border-color: #E85002; }
@@ -232,11 +232,101 @@ aside.w-\[200px\] { transition: margin-left 0.2s ease, opacity 0.2s ease; }
 /* Track volume slider (mini) */
 .track-vol {
   -webkit-appearance: none; appearance: none;
-  height: 2px; background: #3D3D3D; border-radius: 1px; outline: none; width: 48px;
+  height: 2px; background: #3D3D3D; border-radius: 3px; outline: none; width: 48px;
 }
 .track-vol::-webkit-slider-thumb {
   -webkit-appearance: none; width: 8px; height: 8px;
-  background: #D4D4D4; border-radius: 2px; cursor: pointer; border: none;
+  background: #D4D4D4; border-radius: 3px; cursor: pointer; border: none;
+}
+
+/* Track pan slider (mini) */
+.track-pan {
+  -webkit-appearance: none; appearance: none;
+  height: 2px; background: #3D3D3D; border-radius: 3px; outline: none; width: 32px;
+}
+.track-pan::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 6px; height: 6px;
+  background: #D4D4D4; border-radius: 3px; cursor: pointer; border: none;
+}
+
+/* Per-track meter */
+.track-meter {
+  position: relative; width: 36px; height: 4px;
+  background: #1A1A1A; border-radius: 1px; overflow: hidden; flex-shrink: 0;
+}
+.meter-fill {
+  height: 100%; width: 0; background: linear-gradient(to right, #22C55E, #EAB308, #EF4444);
+  border-radius: 1px; transition: width 0.05s linear;
+}
+.meter-fill.meter-clip { background: #EF4444; }
+.meter-peak {
+  position: absolute; top: 0; width: 1px; height: 100%;
+  background: #FFF; transition: left 0.1s linear;
+}
+
+/* Master stereo meter */
+.master-meter-bar {
+  width: 3px; height: 20px; background: #1A1A1A; border-radius: 1px;
+  position: relative; overflow: hidden;
+}
+.master-meter-fill {
+  position: absolute; bottom: 0; width: 100%; height: 0;
+  background: linear-gradient(to top, #22C55E, #EAB308, #EF4444);
+  transition: height 0.05s linear;
+}
+
+/* Block context menu */
+.block-context-menu {
+  position: fixed; z-index: 60; background: #232323; border: 1px solid #3D3D3D;
+  border-radius: 3px; padding: 8px; min-width: 200px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5); font-size: 10px;
+}
+.ctx-header { font-weight: 700; color: #D4D4D4; margin-bottom: 6px; font-size: 11px; }
+.ctx-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; color: #999; }
+.ctx-row span:first-child { width: 50px; flex-shrink: 0; }
+.ctx-row input[type="range"] { flex: 1; height: 2px; }
+.ctx-val { width: 38px; text-align: right; font-family: 'SF Mono', monospace; color: #D4D4D4; font-size: 9px; }
+.ctx-divider { height: 1px; background: #3D3D3D; margin: 4px 0; }
+.ctx-action {
+  display: block; width: 100%; text-align: left; padding: 4px 6px;
+  background: transparent; border: none; color: #999; cursor: pointer;
+  font-size: 10px; border-radius: 2px;
+}
+.ctx-action:hover { background: #2D2D2D; color: #D4D4D4; }
+.ctx-danger:hover { color: #EF4444; }
+
+/* FX Panel */
+.fx-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 10px; border-bottom: 1px solid #3D3D3D;
+}
+.fx-section { padding: 8px 10px; border-bottom: 1px solid #2D2D2D; }
+.fx-section-head { margin-bottom: 6px; }
+.fx-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; color: #999; font-size: 10px; }
+.fx-row span:first-child { width: 44px; flex-shrink: 0; }
+.fx-row input[type="range"] { flex: 1; height: 2px; }
+.fx-val { width: 42px; text-align: right; font-family: 'SF Mono', monospace; color: #D4D4D4; font-size: 9px; }
+
+/* Recording */
+#tl-record.recording {
+  animation: recordPulse 1s ease-in-out infinite;
+  border-color: #EF4444; background: rgba(239, 68, 68, 0.1);
+}
+@keyframes recordPulse {
+  0%, 100% { box-shadow: none; }
+  50% { box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
+}
+.record-armed { border-color: #EF4444 !important; color: #EF4444 !important; }
+
+/* Fade overlay on blocks */
+.block-fade-in, .block-fade-out {
+  position: absolute; top: 0; height: 100%;
+  background: linear-gradient(to right, rgba(26,26,26,0.7), transparent);
+  pointer-events: none;
+}
+.block-fade-out {
+  right: 0;
+  background: linear-gradient(to left, rgba(26,26,26,0.7), transparent);
 }
 
 /* LCD display */
@@ -283,7 +373,7 @@ input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
 .dna-bar-fill { height: 100%; border-radius: 3px; background: #E85002; transition: width 0.6s ease; }
 .dna-char-slider {
   -webkit-appearance: none; appearance: none;
-  height: 4px; border-radius: 2px; outline: none; width: 100%;
+  height: 4px; border-radius: 3px; outline: none; width: 100%;
   background: linear-gradient(to right, #E85002 50%, #3D3D3D 50%);
   transition: background 0.05s;
 }
@@ -325,7 +415,7 @@ input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
   position: fixed; bottom: 16px; right: 16px; z-index: 55;
   width: 350px; height: 460px;
   min-width: 280px; min-height: 300px;
-  background: #232323; border: 1px solid #3D3D3D; border-radius: 6px;
+  background: #232323; border: 1px solid #3D3D3D; border-radius: 3px;
   display: flex; flex-direction: column;
   opacity: 0; pointer-events: none;
   transform: translateY(12px) scale(0.95);

@@ -153,21 +153,21 @@ function renderWelcomeBanner() {
         </div>
       </div>
       <div class="grid grid-cols-3 gap-4">
-        <a href="sounddna.html" class="group bg-surface border border-border rounded-lg p-5 hover:border-brand/30 transition-all flex flex-col items-center text-center">
+        <a href="sounddna.html" class="group bg-surface border border-border rounded-[3px] p-5 hover:border-brand/30 transition-all flex flex-col items-center text-center">
           <div class="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center mb-3">
             <span class="material-symbols-outlined text-brand text-[20px]">fingerprint</span>
           </div>
           <h4 class="text-[13px] font-bold mb-1">Sound DNA</h4>
           <p class="text-[11px] text-txt-muted leading-relaxed">Upload reference tracks and build your sonic identity.</p>
         </a>
-        <div class="group bg-surface border border-border rounded-lg p-5 flex flex-col items-center text-center cursor-pointer hover:border-brand/30 transition-all" onclick="window._blazeToggle()">
+        <div class="group bg-surface border border-border rounded-[3px] p-5 flex flex-col items-center text-center cursor-pointer hover:border-brand/30 transition-all" onclick="window._blazeToggle()">
           <div class="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center mb-3">
             <span class="material-symbols-outlined text-brand text-[20px]">auto_awesome</span>
           </div>
           <h4 class="text-[13px] font-bold mb-1">Blaise</h4>
           <p class="text-[11px] text-txt-muted leading-relaxed">Chat with Blaise to brainstorm sounds and prompts.</p>
         </div>
-        <a href="studio.html" class="group bg-surface border border-border rounded-lg p-5 hover:border-brand/30 transition-all flex flex-col items-center text-center">
+        <a href="studio.html" class="group bg-surface border border-border rounded-[3px] p-5 hover:border-brand/30 transition-all flex flex-col items-center text-center">
           <div class="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center mb-3">
             <span class="material-symbols-outlined text-brand text-[20px]">music_note</span>
           </div>

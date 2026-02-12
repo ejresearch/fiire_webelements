@@ -614,6 +614,7 @@ function renderTimeline() {
   renderTrackHeaders();
   renderTrackLanes();
   renderTimelineBlocks();
+  renderLoopRegion();
   updatePlayhead();
   updateTimelineEmpty();
 }
@@ -669,9 +670,13 @@ function renderTrackHeaders() {
         <input class="track-name flex-1 min-w-0" value="${escapeHtml(track.name)}" onchange="renameTrack('${track.id}', this.value)" spellcheck="false"/>
       </div>
       <div class="track-controls">
+        <button class="track-ctrl-btn ${recordArmedTrack === track.id ? 'record-armed' : ''}" onclick="toggleRecordArm('${track.id}')" title="Record arm">R</button>
         <button class="track-ctrl-btn ${track.muted ? 'active-mute' : ''}" onclick="toggleMuteTrack('${track.id}')">M</button>
         <button class="track-ctrl-btn ${track.solo ? 'active-solo' : ''}" onclick="toggleSoloTrack('${track.id}')">S</button>
+        <input type="range" class="track-pan" min="-100" max="100" value="${Math.round((track.pan || 0) * 100)}" oninput="setTrackPan('${track.id}', this.value / 100)" title="Pan"/>
         <input type="range" class="track-vol" min="0" max="100" value="${Math.round(track.volume * 100)}" oninput="setTrackVolume('${track.id}', this.value / 100)"/>
+        <button class="track-ctrl-btn" onclick="openFxPanel('${track.id}')" title="Effects">FX</button>
+        <div class="track-meter"><div class="meter-fill"></div><div class="meter-peak"></div></div>
         <button class="track-ctrl-btn ml-auto" onclick="deleteTrack('${track.id}')" title="Delete track">
           <span class="material-symbols-outlined text-[10px]">close</span>
         </button>
@@ -751,11 +756,22 @@ function renderTimelineBlocks() {
     div.style.width = Math.max(width, 4) + 'px';
     div.dataset.blockId = block.id;
     div.ondblclick = () => previewSample(block.sampleId);
+    div.oncontextmenu = (e) => showBlockContextMenu(e, block.id);
     div.onmousedown = (e) => handleBlockMouseDown(e, block.id);
 
     const label = sample ? sample.name : 'Unknown';
+    let fadeHtml = '';
+    if (block.fadeIn > 0) {
+      const fadeW = block.fadeIn * ppb;
+      fadeHtml += `<div class="block-fade-in" style="width:${fadeW}px;"></div>`;
+    }
+    if (block.fadeOut > 0) {
+      const fadeW = block.fadeOut * ppb;
+      fadeHtml += `<div class="block-fade-out" style="width:${fadeW}px;"></div>`;
+    }
     div.innerHTML = `<span class="block-label">${escapeHtml(label)}</span>
       <canvas class="block-waveform" data-id="${block.sampleId}"></canvas>
+      ${fadeHtml}
       <div class="block-resize left" onmousedown="event.stopPropagation(); initBlockResize(event, '${block.id}', 'left')"></div>
       <div class="block-resize right" onmousedown="event.stopPropagation(); initBlockResize(event, '${block.id}', 'right')"></div>`;
     lane.appendChild(div);
@@ -799,6 +815,23 @@ function updateTimelineEmpty() {
   }
 }
 
+function renderLoopRegion() {
+  const el = document.getElementById('loop-region');
+  if (!el) return;
+  if (!state.timelineLooping) {
+    el.classList.add('hidden');
+    el.classList.add('pointer-events-none');
+    return;
+  }
+  el.classList.remove('hidden');
+  el.classList.remove('pointer-events-none');
+  const ppb = getPixelsPerBeat();
+  const left = state.timelineLoopStart * ppb - state.timelineScrollX;
+  const width = (state.timelineLoopEnd - state.timelineLoopStart) * ppb;
+  el.style.left = left + 'px';
+  el.style.width = width + 'px';
+}
+
 function getLastBlockEnd() {
   if (!arrangement.blocks.length) return 0;
   return Math.max(...arrangement.blocks.map(b => b.startBeat + b.durationBeats));
@@ -811,15 +844,22 @@ function addTrack(name) {
     id,
     name: name || 'Track ' + arrangement.tracks.length,
     volume: 1.0,
+    pan: 0,
     muted: false,
     solo: false,
     order: arrangement.tracks.length,
+    effects: {
+      eq: { enabled: false, low: 0, mid: 0, high: 0 },
+      reverb: { enabled: false, mix: 0.3, decay: 1.5 },
+      delay: { enabled: false, time: 0.25, feedback: 0.3, mix: 0.2 },
+    },
   });
   saveData();
   renderTimeline();
 }
 
 function deleteTrack(trackId) {
+  destroyTrackNodes(trackId);
   arrangement.tracks = arrangement.tracks.filter(t => t.id !== trackId);
   arrangement.blocks = arrangement.blocks.filter(b => b.trackId !== trackId);
   saveData();
@@ -833,17 +873,51 @@ function renameTrack(trackId, name) {
 
 function toggleMuteTrack(trackId) {
   const track = arrangement.tracks.find(t => t.id === trackId);
-  if (track) { track.muted = !track.muted; saveData(); renderTrackHeaders(); }
+  if (!track) return;
+  track.muted = !track.muted;
+  const nodes = trackNodes[trackId];
+  if (nodes) {
+    nodes.gain.gain.value = track.muted ? 0 : track.volume;
+  }
+  saveData();
+  renderTrackHeaders();
 }
 
 function toggleSoloTrack(trackId) {
   const track = arrangement.tracks.find(t => t.id === trackId);
-  if (track) { track.solo = !track.solo; saveData(); renderTrackHeaders(); }
+  if (!track) return;
+  track.solo = !track.solo;
+  // Recalculate all track gains based on solo state
+  const anySolo = arrangement.tracks.some(t => t.solo);
+  arrangement.tracks.forEach(t => {
+    const n = trackNodes[t.id];
+    if (!n) return;
+    if (t.muted) { n.gain.gain.value = 0; return; }
+    n.gain.gain.value = (anySolo && !t.solo) ? 0 : t.volume;
+  });
+  saveData();
+  renderTrackHeaders();
 }
 
 function setTrackVolume(trackId, value) {
   const track = arrangement.tracks.find(t => t.id === trackId);
-  if (track) { track.volume = value; saveData(); }
+  if (!track) return;
+  track.volume = value;
+  const nodes = trackNodes[trackId];
+  if (nodes && !track.muted) {
+    const anySolo = arrangement.tracks.some(t => t.solo);
+    nodes.gain.gain.value = (anySolo && !track.solo) ? 0 : value;
+  }
+  saveData();
+}
+
+function setTrackPan(trackId, value) {
+  const track = arrangement.tracks.find(t => t.id === trackId);
+  if (!track) return;
+  track.pan = value;
+  const nodes = trackNodes[trackId];
+  if (nodes) nodes.pan.pan.value = value;
+  saveData();
 }
 
 // ==================== BLOCK MANAGEMENT ====================
@@ -855,9 +929,11 @@ function createBlock(opts) {
     sampleId: opts.sampleId,
     startBeat: opts.startBeat || 0,
     durationBeats: opts.durationBeats || 4,
-    offset: 0,
+    offset: opts.offset || 0,
     gain: 1.0,
     loop: false,
+    fadeIn: 0,
+    fadeOut: 0,
   });
   saveData();
   return id;
@@ -865,6 +941,7 @@ function createBlock(opts) {
 
 function deleteSelectedBlocks() {
   if (state.selectedBlocks.size === 0) return;
+  pushUndo();
   arrangement.blocks = arrangement.blocks.filter(b => !state.selectedBlocks.has(b.id));
   state.selectedBlocks.clear();
   saveData();
@@ -989,6 +1066,7 @@ function handleBlockMouseDown(event, blockId) {
   if (!block) return;
   const ppb = getPixelsPerBeat();
 
+  pushUndo();
   blockDragState = {
     blockId,
     startMouseX: event.clientX,
@@ -1032,6 +1110,7 @@ function initBlockResize(event, blockId, edge) {
   event.preventDefault();
   const block = arrangement.blocks.find(b => b.id === blockId);
   if (!block) return;
+  pushUndo();
   const ppb = getPixelsPerBeat();
   const startX = event.clientX;
   const startBeat = block.startBeat;
@@ -1082,7 +1161,7 @@ function timelinePlayPause() {
 }
 
 function timelinePlay() {
-  if (!arrangement.blocks.length) return;
+  if (!arrangement.blocks.length && !recordingState) return;
   ensureAudioContext();
   state.timelinePlaying = true;
 
@@ -1092,6 +1171,7 @@ function timelinePlay() {
 
   timelineEngine.scheduleTimerId = setInterval(scheduleBlocks, timelineEngine.scheduleIntervalMs);
   updatePlayheadRAF();
+  updateMeters();
 
   const btn = document.querySelector('#tl-play .material-symbols-outlined');
   if (btn) btn.textContent = 'pause';
@@ -1110,6 +1190,8 @@ function timelinePause() {
 
   clearInterval(timelineEngine.scheduleTimerId);
   cancelAnimationFrame(timelineEngine.rafId);
+  cancelAnimationFrame(meterRAFId);
+  updateMeters(); // decay to zero
 
   const btn = document.querySelector('#tl-play .material-symbols-outlined');
   if (btn) btn.textContent = 'play_arrow';
@@ -1128,6 +1210,7 @@ function timelineToggleLoop() {
     icon.classList.toggle('text-brand', state.timelineLooping);
     icon.classList.toggle('text-txt-dim', !state.timelineLooping);
   }
+  renderLoopRegion();
 }
 
 function setTimelineBPM(value) {
@@ -1200,10 +1283,9 @@ function scheduleBlock(block) {
   if (!sample) return;
 
   const track = arrangement.tracks.find(t => t.id === block.trackId);
-  if (!track || track.muted) return;
+  if (!track) return;
 
-  const anySolo = arrangement.tracks.some(t => t.solo);
-  if (anySolo && !track.solo) return;
+  // Mute/solo handled by per-track gain nodes — no need to skip scheduling
 
   getAudioBuffer(block.sampleId).then(buffer => {
     if (!buffer || !state.timelinePlaying) return;
@@ -1212,12 +1294,16 @@ function scheduleBlock(block) {
     source.buffer = buffer;
 
     const blockGain = audioCtx.createGain();
-    blockGain.gain.value = block.gain * track.volume;
-    source.connect(blockGain);
-    blockGain.connect(masterGain);
+    blockGain.gain.value = block.gain;
 
+    // Route through per-track node chain instead of directly to master
+    const nodes = ensureTrackNodes(block.trackId);
+    source.connect(blockGain);
+    blockGain.connect(nodes.input);
+
+    const beatsPerSecond = state.timelineBPM / 60;
     const startTime = beatToCtxTime(block.startBeat);
-    const durationSec = block.durationBeats / (state.timelineBPM / 60);
+    const durationSec = block.durationBeats / beatsPerSecond;
     const endTime = startTime + durationSec;
 
     const now = audioCtx.currentTime;
@@ -1227,10 +1313,33 @@ function scheduleBlock(block) {
 
     if (remaining <= 0) return;
 
+    // Apply fade-in automation
+    if (block.fadeIn > 0) {
+      const fadeInSec = block.fadeIn / beatsPerSecond;
+      const fadeInStart = startTime;
+      const fadeInEnd = startTime + fadeInSec;
+      if (now < fadeInEnd) {
+        // If we're joining mid-fade, calculate current value
+        const fadeProgress = Math.max(0, (now - fadeInStart) / fadeInSec);
+        blockGain.gain.setValueAtTime(block.gain * fadeProgress, actualStart);
+        blockGain.gain.linearRampToValueAtTime(block.gain, Math.max(actualStart, fadeInEnd));
+      }
+    }
+
+    // Apply fade-out automation
+    if (block.fadeOut > 0) {
+      const fadeOutSec = block.fadeOut / beatsPerSecond;
+      const fadeOutStart = endTime - fadeOutSec;
+      if (fadeOutStart > now) {
+        blockGain.gain.setValueAtTime(block.gain, fadeOutStart);
+        blockGain.gain.linearRampToValueAtTime(0, endTime);
+      }
+    }
+
     source.start(actualStart, block.offset + offset, remaining);
 
     timelineEngine.scheduledSources.push({
-      source, blockId: block.id,
+      source, blockGain, blockId: block.id,
       startTime: actualStart, endTime,
     });
   });
@@ -1264,7 +1373,20 @@ function seekTimeline(event) {
   const rect = ruler.getBoundingClientRect();
   const x = event.clientX - rect.left + state.timelineScrollX;
   const ppb = getPixelsPerBeat();
-  state.timelinePlayheadBeat = Math.max(0, x / ppb);
+  const beat = Math.max(0, snapToBeat(x / ppb));
+
+  // Alt+click sets loop start, Alt+Shift+click sets loop end
+  if (event.altKey) {
+    if (event.shiftKey) {
+      state.timelineLoopEnd = Math.max(beat, state.timelineLoopStart + 1);
+    } else {
+      state.timelineLoopStart = Math.min(beat, state.timelineLoopEnd - 1);
+    }
+    renderLoopRegion();
+    return;
+  }
+
+  state.timelinePlayheadBeat = beat;
   updatePlayhead();
 
   if (state.timelinePlaying) {
@@ -1536,6 +1658,568 @@ function refinePrompt() {
   });
 })();
 
+// ==================== AUDIO IMPORT ====================
+function handleAudioImport(files) {
+  if (!files || !files.length) return;
+  ensureAudioContext();
+
+  Array.from(files).forEach(file => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      audioCtx.decodeAudioData(e.target.result).then(buffer => {
+        const id = 'smp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+        const waveformData = extractWaveform(buffer);
+        const sample = {
+          id, name: file.name.replace(/\.[^.]+$/, ''),
+          type: 'imported', mode: 'oneshot',
+          duration: buffer.duration,
+          waveformData,
+          createdAt: new Date().toISOString(),
+        };
+        samples[id] = sample;
+        cacheAndPersistBuffer(id, buffer);
+        addToBaseSamples(id);
+        showToast(`Imported "${sample.name}"`);
+      }).catch(() => showToast(`Failed to decode ${file.name}`));
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function extractWaveform(buffer) {
+  const raw = buffer.getChannelData(0);
+  const peaks = 100;
+  const step = Math.floor(raw.length / peaks);
+  const data = [];
+  for (let i = 0; i < peaks; i++) {
+    let max = 0;
+    for (let j = 0; j < step; j++) {
+      const v = Math.abs(raw[i * step + j] || 0);
+      if (v > max) max = v;
+    }
+    data.push(max);
+  }
+  return data;
+}
+
+function triggerAudioImport() {
+  let input = document.getElementById('audio-import-input');
+  if (!input) {
+    input = document.createElement('input');
+    input.type = 'file';
+    input.id = 'audio-import-input';
+    input.accept = 'audio/*,.wav,.mp3,.ogg,.flac';
+    input.multiple = true;
+    input.style.display = 'none';
+    input.onchange = () => handleAudioImport(input.files);
+    document.body.appendChild(input);
+  }
+  input.value = '';
+  input.click();
+}
+
+// Drag-drop audio files onto base samples grid
+(function initAudioDrop() {
+  const grid = document.getElementById('base-samples-grid');
+  if (!grid) return;
+  grid.addEventListener('dragover', (e) => {
+    if (e.dataTransfer.types.includes('Files')) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      grid.classList.add('drag-over-import');
+    }
+  });
+  grid.addEventListener('dragleave', () => grid.classList.remove('drag-over-import'));
+  grid.addEventListener('drop', (e) => {
+    e.preventDefault();
+    grid.classList.remove('drag-over-import');
+    const audioFiles = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('audio/') || /\.(wav|mp3|ogg|flac)$/i.test(f.name));
+    if (audioFiles.length) handleAudioImport(audioFiles);
+  });
+})();
+
+// ==================== BLOCK CONTEXT MENU ====================
+let activeContextMenu = null;
+
+function showBlockContextMenu(event, blockId) {
+  event.preventDefault();
+  hideBlockContextMenu();
+  const block = arrangement.blocks.find(b => b.id === blockId);
+  if (!block) return;
+
+  const menu = document.createElement('div');
+  menu.className = 'block-context-menu';
+  menu.innerHTML = `
+    <div class="ctx-header">${escapeHtml(samples[block.sampleId]?.name || 'Block')}</div>
+    <label class="ctx-row"><span>Gain</span><input type="range" min="0" max="200" value="${Math.round(block.gain * 100)}" oninput="setBlockGain('${blockId}', this.value / 100)"/><span class="ctx-val">${Math.round(block.gain * 100)}%</span></label>
+    <label class="ctx-row"><span>Fade In</span><input type="range" min="0" max="40" value="${Math.round(block.fadeIn * 10)}" oninput="setBlockFade('${blockId}', 'fadeIn', this.value / 10)"/><span class="ctx-val">${block.fadeIn.toFixed(1)}b</span></label>
+    <label class="ctx-row"><span>Fade Out</span><input type="range" min="0" max="40" value="${Math.round(block.fadeOut * 10)}" oninput="setBlockFade('${blockId}', 'fadeOut', this.value / 10)"/><span class="ctx-val">${block.fadeOut.toFixed(1)}b</span></label>
+    <div class="ctx-divider"></div>
+    <button class="ctx-action" onclick="splitBlockAtPlayhead('${blockId}'); hideBlockContextMenu();">Split at Playhead</button>
+    <button class="ctx-action ctx-danger" onclick="deleteBlock('${blockId}'); hideBlockContextMenu();">Delete</button>
+  `;
+  menu.style.left = event.clientX + 'px';
+  menu.style.top = event.clientY + 'px';
+  document.body.appendChild(menu);
+  activeContextMenu = menu;
+
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('mousedown', handleContextMenuClose);
+  }, 0);
+}
+
+function handleContextMenuClose(e) {
+  if (activeContextMenu && !activeContextMenu.contains(e.target)) {
+    hideBlockContextMenu();
+  }
+}
+
+function hideBlockContextMenu() {
+  if (activeContextMenu) {
+    activeContextMenu.remove();
+    activeContextMenu = null;
+  }
+  document.removeEventListener('mousedown', handleContextMenuClose);
+}
+
+function setBlockGain(blockId, value) {
+  const block = arrangement.blocks.find(b => b.id === blockId);
+  if (!block) return;
+  pushUndo();
+  block.gain = Math.max(0, Math.min(2, value));
+  // Update live gain if playing
+  const scheduled = timelineEngine.scheduledSources.find(s => s.blockId === blockId);
+  if (scheduled?.blockGain) scheduled.blockGain.gain.value = block.gain;
+  // Update context menu display
+  const menu = activeContextMenu;
+  if (menu) {
+    const vals = menu.querySelectorAll('.ctx-val');
+    if (vals[0]) vals[0].textContent = Math.round(block.gain * 100) + '%';
+  }
+  saveData();
+}
+
+function setBlockFade(blockId, prop, value) {
+  const block = arrangement.blocks.find(b => b.id === blockId);
+  if (!block) return;
+  pushUndo();
+  block[prop] = Math.max(0, value);
+  const menu = activeContextMenu;
+  if (menu) {
+    const vals = menu.querySelectorAll('.ctx-val');
+    const idx = prop === 'fadeIn' ? 1 : 2;
+    if (vals[idx]) vals[idx].textContent = block[prop].toFixed(1) + 'b';
+  }
+  saveData();
+}
+
+function deleteBlock(blockId) {
+  pushUndo();
+  arrangement.blocks = arrangement.blocks.filter(b => b.id !== blockId);
+  state.selectedBlocks.delete(blockId);
+  saveData();
+  renderTimelineBlocks();
+}
+
+// ==================== SPLIT / CUT ====================
+function splitBlockAtPlayhead(blockId) {
+  const beat = getCurrentBeat();
+  const blocksToSplit = blockId
+    ? [arrangement.blocks.find(b => b.id === blockId)].filter(Boolean)
+    : arrangement.blocks.filter(b => state.selectedBlocks.has(b.id));
+
+  if (!blocksToSplit.length) {
+    // Split all blocks at playhead
+    blocksToSplit.push(...arrangement.blocks.filter(b =>
+      b.startBeat < beat && (b.startBeat + b.durationBeats) > beat
+    ));
+  }
+
+  if (!blocksToSplit.length) return;
+  pushUndo();
+
+  blocksToSplit.forEach(block => {
+    const blockEnd = block.startBeat + block.durationBeats;
+    if (beat <= block.startBeat || beat >= blockEnd) return;
+
+    const splitPoint = beat - block.startBeat;
+    const newBlock = {
+      id: 'blk_' + (++blockIdCounter),
+      trackId: block.trackId,
+      sampleId: block.sampleId,
+      startBeat: beat,
+      durationBeats: block.durationBeats - splitPoint,
+      offset: block.offset + splitPoint / (state.timelineBPM / 60),
+      gain: block.gain,
+      fadeIn: 0,
+      fadeOut: block.fadeOut,
+    };
+    block.durationBeats = splitPoint;
+    block.fadeOut = 0;
+    arrangement.blocks.push(newBlock);
+  });
+
+  saveData();
+  renderTimelineBlocks();
+}
+
+// ==================== UNDO / REDO ====================
+let undoHistory = [];
+let redoStack = [];
+const MAX_UNDO = 50;
+
+function pushUndo() {
+  undoHistory.push(JSON.stringify({
+    tracks: arrangement.tracks,
+    blocks: arrangement.blocks,
+  }));
+  if (undoHistory.length > MAX_UNDO) undoHistory.shift();
+  redoStack = [];
+}
+
+function undo() {
+  if (!undoHistory.length) return;
+  redoStack.push(JSON.stringify({
+    tracks: arrangement.tracks,
+    blocks: arrangement.blocks,
+  }));
+  const snapshot = JSON.parse(undoHistory.pop());
+  arrangement.tracks = snapshot.tracks;
+  arrangement.blocks = snapshot.blocks;
+  state.selectedBlocks.clear();
+  saveData();
+  renderTimeline();
+}
+
+function redo() {
+  if (!redoStack.length) return;
+  undoHistory.push(JSON.stringify({
+    tracks: arrangement.tracks,
+    blocks: arrangement.blocks,
+  }));
+  const snapshot = JSON.parse(redoStack.pop());
+  arrangement.tracks = snapshot.tracks;
+  arrangement.blocks = snapshot.blocks;
+  state.selectedBlocks.clear();
+  saveData();
+  renderTimeline();
+}
+
+// ==================== METERING ====================
+let meterRAFId = null;
+
+function updateMeters() {
+  if (!state.timelinePlaying) {
+    // Decay meters to zero when stopped
+    document.querySelectorAll('.meter-fill').forEach(el => el.style.width = '0');
+    document.querySelectorAll('.meter-peak').forEach(el => el.style.left = '0');
+    const masterL = document.getElementById('master-meter-l');
+    const masterR = document.getElementById('master-meter-r');
+    if (masterL) masterL.style.height = '0';
+    if (masterR) masterR.style.height = '0';
+    return;
+  }
+
+  // Per-track meters
+  arrangement.tracks.forEach(track => {
+    const nodes = trackNodes[track.id];
+    if (!nodes) return;
+    const header = document.querySelector(`.track-header[data-track="${track.id}"]`);
+    if (!header) return;
+    const fill = header.querySelector('.meter-fill');
+    const peak = header.querySelector('.meter-peak');
+    if (!fill) return;
+
+    const dataArray = new Float32Array(nodes.analyser.fftSize);
+    nodes.analyser.getFloatTimeDomainData(dataArray);
+    let rms = 0;
+    let maxVal = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+      rms += dataArray[i] * dataArray[i];
+      const abs = Math.abs(dataArray[i]);
+      if (abs > maxVal) maxVal = abs;
+    }
+    rms = Math.sqrt(rms / dataArray.length);
+    const dbRMS = Math.max(0, Math.min(100, (20 * Math.log10(rms) + 60) * 100 / 60));
+    const dbPeak = Math.max(0, Math.min(100, (20 * Math.log10(maxVal) + 60) * 100 / 60));
+    fill.style.width = dbRMS + '%';
+    if (peak) peak.style.left = dbPeak + '%';
+    if (dbPeak > 98) fill.classList.add('meter-clip');
+    else fill.classList.remove('meter-clip');
+  });
+
+  // Master stereo meter
+  if (masterAnalyserL && masterAnalyserR) {
+    const bufL = new Float32Array(masterAnalyserL.fftSize);
+    const bufR = new Float32Array(masterAnalyserR.fftSize);
+    masterAnalyserL.getFloatTimeDomainData(bufL);
+    masterAnalyserR.getFloatTimeDomainData(bufR);
+
+    [['master-meter-l', bufL], ['master-meter-r', bufR]].forEach(([id, buf]) => {
+      let rms = 0;
+      for (let i = 0; i < buf.length; i++) rms += buf[i] * buf[i];
+      rms = Math.sqrt(rms / buf.length);
+      const db = Math.max(0, Math.min(100, (20 * Math.log10(rms) + 60) * 100 / 60));
+      const el = document.getElementById(id);
+      if (el) el.style.height = db + '%';
+    });
+  }
+
+  meterRAFId = requestAnimationFrame(updateMeters);
+}
+
+// ==================== FX PANEL ====================
+let fxPanelTrackId = null;
+
+function openFxPanel(trackId) {
+  const track = arrangement.tracks.find(t => t.id === trackId);
+  if (!track) return;
+  fxPanelTrackId = trackId;
+
+  const panel = document.getElementById('fx-panel');
+  if (!panel) return;
+  panel.classList.remove('hidden');
+  renderFxPanel();
+}
+
+function closeFxPanel() {
+  fxPanelTrackId = null;
+  const panel = document.getElementById('fx-panel');
+  if (panel) panel.classList.add('hidden');
+}
+
+function renderFxPanel() {
+  const panel = document.getElementById('fx-panel');
+  if (!panel || !fxPanelTrackId) return;
+  const track = arrangement.tracks.find(t => t.id === fxPanelTrackId);
+  if (!track) return;
+  const fx = track.effects;
+
+  panel.innerHTML = `
+    <div class="fx-header">
+      <span class="section-label">FX — ${escapeHtml(track.name)}</span>
+      <button onclick="closeFxPanel()" class="text-txt-dim hover:text-txt"><span class="material-symbols-outlined text-[14px]">close</span></button>
+    </div>
+    <div class="fx-section">
+      <div class="fx-section-head">
+        <button class="track-ctrl-btn ${fx.eq.enabled ? 'active-solo' : ''}" onclick="toggleEffect('eq')">EQ</button>
+      </div>
+      <label class="fx-row"><span>Low</span><input type="range" min="-12" max="12" value="${fx.eq.low}" step="0.5" oninput="setEqBand('low', this.value)"/><span class="fx-val">${fx.eq.low > 0 ? '+' : ''}${fx.eq.low}dB</span></label>
+      <label class="fx-row"><span>Mid</span><input type="range" min="-12" max="12" value="${fx.eq.mid}" step="0.5" oninput="setEqBand('mid', this.value)"/><span class="fx-val">${fx.eq.mid > 0 ? '+' : ''}${fx.eq.mid}dB</span></label>
+      <label class="fx-row"><span>High</span><input type="range" min="-12" max="12" value="${fx.eq.high}" step="0.5" oninput="setEqBand('high', this.value)"/><span class="fx-val">${fx.eq.high > 0 ? '+' : ''}${fx.eq.high}dB</span></label>
+    </div>
+    <div class="fx-section">
+      <div class="fx-section-head">
+        <button class="track-ctrl-btn ${fx.reverb.enabled ? 'active-solo' : ''}" onclick="toggleEffect('reverb')">REVERB</button>
+      </div>
+      <label class="fx-row"><span>Mix</span><input type="range" min="0" max="100" value="${Math.round(fx.reverb.mix * 100)}" oninput="setReverbMix(this.value / 100)"/><span class="fx-val">${Math.round(fx.reverb.mix * 100)}%</span></label>
+      <label class="fx-row"><span>Decay</span><input type="range" min="1" max="50" value="${Math.round(fx.reverb.decay * 10)}" oninput="setReverbDecay(this.value / 10)"/><span class="fx-val">${fx.reverb.decay.toFixed(1)}s</span></label>
+    </div>
+    <div class="fx-section">
+      <div class="fx-section-head">
+        <button class="track-ctrl-btn ${fx.delay.enabled ? 'active-solo' : ''}" onclick="toggleEffect('delay')">DELAY</button>
+      </div>
+      <label class="fx-row"><span>Time</span><input type="range" min="1" max="200" value="${Math.round(fx.delay.time * 100)}" oninput="setDelayTime(this.value / 100)"/><span class="fx-val">${fx.delay.time.toFixed(2)}s</span></label>
+      <label class="fx-row"><span>Feedback</span><input type="range" min="0" max="90" value="${Math.round(fx.delay.feedback * 100)}" oninput="setDelayFeedback(this.value / 100)"/><span class="fx-val">${Math.round(fx.delay.feedback * 100)}%</span></label>
+      <label class="fx-row"><span>Mix</span><input type="range" min="0" max="100" value="${Math.round(fx.delay.mix * 100)}" oninput="setDelayMix(this.value / 100)"/><span class="fx-val">${Math.round(fx.delay.mix * 100)}%</span></label>
+    </div>
+  `;
+}
+
+function toggleEffect(type) {
+  if (!fxPanelTrackId) return;
+  const track = arrangement.tracks.find(t => t.id === fxPanelTrackId);
+  if (!track) return;
+  track.effects[type].enabled = !track.effects[type].enabled;
+
+  const nodes = trackNodes[fxPanelTrackId];
+  if (nodes) {
+    const fx = track.effects;
+    if (type === 'eq') {
+      nodes.eqLow.gain.value = fx.eq.enabled ? fx.eq.low : 0;
+      nodes.eqMid.gain.value = fx.eq.enabled ? fx.eq.mid : 0;
+      nodes.eqHigh.gain.value = fx.eq.enabled ? fx.eq.high : 0;
+    } else if (type === 'reverb') {
+      nodes.reverbDry.gain.value = fx.reverb.enabled ? (1 - fx.reverb.mix) : 1;
+      nodes.reverbWet.gain.value = fx.reverb.enabled ? fx.reverb.mix : 0;
+    } else if (type === 'delay') {
+      nodes.delayDry.gain.value = fx.delay.enabled ? (1 - fx.delay.mix) : 1;
+      nodes.delayWet.gain.value = fx.delay.enabled ? fx.delay.mix : 0;
+      nodes.delayFeedback.gain.value = fx.delay.enabled ? fx.delay.feedback : 0;
+    }
+  }
+  saveData();
+  renderFxPanel();
+}
+
+function setEqBand(band, value) {
+  if (!fxPanelTrackId) return;
+  const track = arrangement.tracks.find(t => t.id === fxPanelTrackId);
+  if (!track) return;
+  track.effects.eq[band] = parseFloat(value);
+  const nodes = trackNodes[fxPanelTrackId];
+  if (nodes && track.effects.eq.enabled) {
+    const nodeMap = { low: 'eqLow', mid: 'eqMid', high: 'eqHigh' };
+    nodes[nodeMap[band]].gain.value = parseFloat(value);
+  }
+  saveData();
+}
+
+function setReverbMix(value) {
+  if (!fxPanelTrackId) return;
+  const track = arrangement.tracks.find(t => t.id === fxPanelTrackId);
+  if (!track) return;
+  track.effects.reverb.mix = value;
+  const nodes = trackNodes[fxPanelTrackId];
+  if (nodes && track.effects.reverb.enabled) {
+    nodes.reverbDry.gain.value = 1 - value;
+    nodes.reverbWet.gain.value = value;
+  }
+  saveData();
+}
+
+function setReverbDecay(value) {
+  if (!fxPanelTrackId) return;
+  const track = arrangement.tracks.find(t => t.id === fxPanelTrackId);
+  if (!track) return;
+  track.effects.reverb.decay = value;
+  // Rebuild reverb IR
+  const nodes = trackNodes[fxPanelTrackId];
+  if (nodes) {
+    const ir = generateImpulseResponse(value, value);
+    nodes.reverbConvolver.buffer = ir;
+  }
+  saveData();
+}
+
+function setDelayTime(value) {
+  if (!fxPanelTrackId) return;
+  const track = arrangement.tracks.find(t => t.id === fxPanelTrackId);
+  if (!track) return;
+  track.effects.delay.time = value;
+  const nodes = trackNodes[fxPanelTrackId];
+  if (nodes) nodes.delayNode.delayTime.value = value;
+  saveData();
+}
+
+function setDelayFeedback(value) {
+  if (!fxPanelTrackId) return;
+  const track = arrangement.tracks.find(t => t.id === fxPanelTrackId);
+  if (!track) return;
+  track.effects.delay.feedback = value;
+  const nodes = trackNodes[fxPanelTrackId];
+  if (nodes && track.effects.delay.enabled) nodes.delayFeedback.gain.value = value;
+  saveData();
+}
+
+function setDelayMix(value) {
+  if (!fxPanelTrackId) return;
+  const track = arrangement.tracks.find(t => t.id === fxPanelTrackId);
+  if (!track) return;
+  track.effects.delay.mix = value;
+  const nodes = trackNodes[fxPanelTrackId];
+  if (nodes && track.effects.delay.enabled) {
+    nodes.delayDry.gain.value = 1 - value;
+    nodes.delayWet.gain.value = value;
+  }
+  saveData();
+}
+
+// ==================== RECORDING ====================
+let recordingState = null;
+let recordArmedTrack = null;
+
+function toggleRecordArm(trackId) {
+  if (recordArmedTrack === trackId) {
+    recordArmedTrack = null;
+  } else {
+    recordArmedTrack = trackId;
+  }
+  renderTrackHeaders();
+}
+
+function startRecording() {
+  if (!recordArmedTrack) {
+    showToast('Arm a track first (click R on track header)');
+    return;
+  }
+  if (recordingState) return;
+
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+    ensureAudioContext();
+    const mediaRecorder = new MediaRecorder(stream);
+    const chunks = [];
+    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(chunks, { type: 'audio/webm' });
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        audioCtx.decodeAudioData(e.target.result).then(buffer => {
+          const id = 'smp_rec_' + Date.now();
+          const waveformData = extractWaveform(buffer);
+          const sample = {
+            id, name: 'Recording ' + new Date().toLocaleTimeString(),
+            type: 'recording', mode: 'oneshot',
+            duration: buffer.duration,
+            waveformData,
+            createdAt: new Date().toISOString(),
+          };
+          samples[id] = sample;
+          cacheAndPersistBuffer(id, buffer);
+
+          // Create block on armed track at record start position
+          const durationBeats = sampleDurationToBeats(buffer.duration, state.timelineBPM);
+          createBlock({
+            trackId: recordingState.trackId,
+            sampleId: id,
+            startBeat: recordingState.startBeat,
+            durationBeats,
+          });
+          addToBaseSamples(id);
+          renderTimeline();
+          showToast('Recording saved');
+        });
+      };
+      reader.readAsArrayBuffer(blob);
+      recordingState = null;
+      updateRecordingUI();
+    };
+
+    recordingState = {
+      mediaRecorder,
+      trackId: recordArmedTrack,
+      startBeat: getCurrentBeat(),
+    };
+    mediaRecorder.start();
+    updateRecordingUI();
+
+    // Auto-start playback if not playing
+    if (!state.timelinePlaying) timelinePlay();
+  }).catch(err => {
+    showToast('Microphone access denied');
+    console.error('Recording error:', err);
+  });
+}
+
+function stopRecording() {
+  if (!recordingState) return;
+  recordingState.mediaRecorder.stop();
+}
+
+function toggleRecording() {
+  if (recordingState) stopRecording();
+  else startRecording();
+}
+
+function updateRecordingUI() {
+  const btn = document.getElementById('tl-record');
+  if (btn) {
+    btn.classList.toggle('recording', !!recordingState);
+  }
+}
+
 // ==================== KEYBOARD SHORTCUTS ====================
 document.addEventListener('keydown', (e) => {
   // Don't handle when typing in inputs
@@ -1548,8 +2232,18 @@ document.addEventListener('keydown', (e) => {
     deleteSelectedBlocks();
   } else if (e.key === 'Escape') {
     closeInlineGeneration();
+    closeFxPanel();
+    hideBlockContextMenu();
     state.selectedBlocks.clear();
     renderTimelineBlocks();
+  } else if (e.key === 's' || e.key === 'S') {
+    if (!e.ctrlKey && !e.metaKey) splitBlockAtPlayhead();
+  } else if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    if (e.shiftKey) redo();
+    else undo();
+  } else if (e.key === 'r' || e.key === 'R') {
+    if (!e.ctrlKey && !e.metaKey) toggleRecording();
   }
 });
 
@@ -1568,6 +2262,7 @@ document.getElementById('track-content')?.addEventListener('scroll', (e) => {
   state.timelineScrollX = e.target.scrollLeft;
   state.timelineScrollY = e.target.scrollTop;
   renderTimeRuler();
+  renderLoopRegion();
 
   // Sync track headers vertical scroll
   const headers = document.getElementById('track-headers');

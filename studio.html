@@ -121,6 +121,9 @@ tailwind.config = {
     <button id="tl-play" class="transport-btn w-7 h-7 flex items-center justify-center" onclick="timelinePlayPause()">
       <span class="material-symbols-outlined text-brand text-[14px]">play_arrow</span>
     </button>
+    <button id="tl-record" class="transport-btn w-7 h-7 flex items-center justify-center" onclick="toggleRecording()" title="Record (R)">
+      <span class="material-symbols-outlined text-[14px]" style="color:#EF4444;">fiber_manual_record</span>
+    </button>
     <button id="tl-loop" class="transport-btn w-7 h-7 flex items-center justify-center" onclick="timelineToggleLoop()">
       <span class="material-symbols-outlined text-txt-dim text-[14px]">loop</span>
     </button>
@@ -151,6 +154,10 @@ tailwind.config = {
     <button onclick="toggleMute()" class="text-txt-muted hover:text-txt"><span id="volume-icon" class="material-symbols-outlined text-[14px]">volume_up</span></button>
     <input id="volume-slider" type="range" min="0" max="100" value="66" class="w-12 range-slider" oninput="setVolume(this.value)"/>
   </div>
+  <div class="master-meter flex items-center gap-0.5 h-5">
+    <div class="master-meter-bar"><div id="master-meter-l" class="master-meter-fill"></div></div>
+    <div class="master-meter-bar"><div id="master-meter-r" class="master-meter-fill"></div></div>
+  </div>
 </div>
 
 <!-- ===== API KEY WARNING ===== -->
@@ -169,7 +176,7 @@ tailwind.config = {
       <span class="section-label">BASE SAMPLES</span>
       <div class="flex items-center gap-2">
         <span id="base-count" class="text-[9px] text-txt-dim font-mono">0 / 12</span>
-        <button class="text-txt-dim hover:text-txt transition-colors" onclick="openImportModal()" title="Import samples">
+        <button class="text-txt-dim hover:text-txt transition-colors" onclick="triggerAudioImport()" title="Import audio files">
           <span class="material-symbols-outlined text-[14px]">upload</span>
         </button>
       </div>
@@ -383,6 +390,10 @@ tailwind.config = {
     <div id="var-grid" class="max-h-[240px] overflow-y-auto"></div>
     <div id="gen-summary" class="hidden flex items-center justify-between px-3 py-1.5 border-t border-border"></div>
   </div>
+</div>
+
+<!-- ===== FX PANEL ===== -->
+<div id="fx-panel" class="hidden fixed z-50 bg-panel border border-border" style="width: 280px; right: 16px; top: 80px; max-height: 80vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.5); border-radius: 3px;">
 </div>
 
 <!-- ===== CLICK OUTSIDE INLINE GEN OVERLAY ===== -->
