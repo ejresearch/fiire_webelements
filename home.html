@@ -94,16 +94,16 @@ tailwind.config = {
       <span class="material-symbols-outlined text-[16px]">music_note</span>
       <span class="text-[11px] font-medium uppercase tracking-wide">Studio</span>
     </a>
+    <button onclick="openSettingsModal()" class="nav-link flex items-center gap-2 px-2 py-1 w-full text-left">
+      <span class="material-symbols-outlined text-[16px]">settings</span>
+      <span class="text-[11px] font-medium uppercase tracking-wide">Settings</span>
+    </button>
   </nav>
-  <div class="p-2 border-t border-border space-y-1">
+  <div class="p-2 border-t border-border">
     <a href="studio.html" class="w-full flex items-center justify-center gap-1 py-1.5 bg-brand hover:bg-brand-hover text-txt font-bold text-[11px] uppercase transition-all">
       <span class="material-symbols-outlined text-[14px]">add</span>
       New Session
     </a>
-    <button onclick="openSettingsModal()" class="w-full flex items-center gap-2 px-2 py-1 text-txt-muted hover:text-txt hover:bg-surface transition-colors">
-      <span class="material-symbols-outlined text-[14px]">settings</span>
-      <span class="text-[11px]">Settings</span>
-    </button>
   </div>
 </aside>
 
@@ -125,7 +125,7 @@ tailwind.config = {
       <div class="flex items-center gap-3 px-4 py-2 border border-border bg-panel mb-3">
         <div class="relative">
           <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-txt-dim text-[16px]">search</span>
-          <input id="lib-search" class="ab-input pl-8 pr-3 py-1 text-[11px] w-[160px]" placeholder="Search..." type="text" oninput="renderLibrary({global:true})"/>
+          <input id="lib-search" class="ab-input pl-8 pr-3 text-[11px] w-[200px]" placeholder="Search..." type="text" oninput="renderLibrary({global:true})"/>
         </div>
         <div class="flex gap-1" id="lib-type-chips">
           <button class="param-chip active text-[10px]" onclick="setLibType('all', this)">ALL</button>
@@ -133,21 +133,38 @@ tailwind.config = {
           <button class="param-chip text-[10px]" onclick="setLibType('oneshot', this)">1-SHOT</button>
           <button class="param-chip text-[10px]" onclick="setLibType('favorites', this)">FAV</button>
         </div>
-        <select id="lib-source-filter" class="ab-select text-[10px] py-1 px-2" onchange="renderLibrary({global:true})">
-          <option value="all">All Sources</option>
-          <option value="dna">Sound DNA</option>
-        </select>
-        <select id="lib-key-filter" class="ab-select text-[10px] py-1 px-2" onchange="renderLibrary({global:true})">
-          <option value="all">All Keys</option>
-          <option>C</option><option>Cm</option><option>D</option><option>Dm</option><option>E</option><option>Em</option>
-          <option>F</option><option>Fm</option><option>G</option><option>Gm</option><option>A</option><option>Am</option><option>B</option><option>Bm</option>
-        </select>
-        <select id="lib-sort" class="ab-select text-[10px] py-1 px-2" onchange="renderLibrary({global:true})">
-          <option value="recent">Newest</option>
-          <option value="oldest">Oldest</option>
-          <option value="name">Name A-Z</option>
-          <option value="bpm">BPM</option>
-        </select>
+        <div class="filter-popover-wrap">
+          <button class="p-1 text-txt-muted hover:text-txt hover:bg-surface transition-colors relative" onclick="toggleFilterPopover(event)">
+            <span class="material-symbols-outlined text-[16px]">tune</span>
+            <span id="lib-filter-dot" class="filter-dot"></span>
+          </button>
+          <div id="lib-filter-popover" class="filter-popover">
+            <div>
+              <label>Source</label>
+              <select id="lib-source-filter" class="ab-select text-[10px] py-1 px-2" onchange="renderLibrary({global:true}); updateFilterDot()">
+                <option value="all">All Sources</option>
+                <option value="dna">Sound DNA</option>
+              </select>
+            </div>
+            <div>
+              <label>Key</label>
+              <select id="lib-key-filter" class="ab-select text-[10px] py-1 px-2" onchange="renderLibrary({global:true}); updateFilterDot()">
+                <option value="all">All Keys</option>
+                <option>C</option><option>Cm</option><option>D</option><option>Dm</option><option>E</option><option>Em</option>
+                <option>F</option><option>Fm</option><option>G</option><option>Gm</option><option>A</option><option>Am</option><option>B</option><option>Bm</option>
+              </select>
+            </div>
+            <div>
+              <label>Sort</label>
+              <select id="lib-sort" class="ab-select text-[10px] py-1 px-2" onchange="renderLibrary({global:true}); updateFilterDot()">
+                <option value="recent">Newest</option>
+                <option value="oldest">Oldest</option>
+                <option value="name">Name A-Z</option>
+                <option value="bpm">BPM</option>
+              </select>
+            </div>
+          </div>
+        </div>
         <div class="flex gap-1 ml-auto">
           <button id="lib-grid-btn" class="p-1 bg-surface border border-border text-brand" onclick="setLibView('grid')">
             <span class="material-symbols-outlined text-[16px]">grid_view</span>
@@ -163,7 +180,7 @@ tailwind.config = {
         <div id="lib-list" class="hidden bg-panel border border-border overflow-hidden">
           <table class="w-full text-left border-collapse">
             <thead><tr class="bg-surface">
-              <th class="px-4 py-3 w-10"><input type="checkbox" class="rounded border-border" onchange="toggleSelectAll(this)"/></th>
+
               <th class="px-4 py-3 text-xs font-semibold">Sample</th>
               <th class="px-4 py-3 text-xs font-semibold">Type</th>
               <th class="px-4 py-3 text-xs font-semibold">Key</th>
@@ -212,7 +229,7 @@ tailwind.config = {
     </div>
     <div class="flex items-center gap-2 flex-shrink-0">
       <button id="player-fav-btn" class="text-txt-muted hover:text-brand transition-colors" onclick="togglePlayerFav()">
-        <span class="material-symbols-outlined text-[14px]">favorite</span>
+        <span class="material-symbols-outlined text-[14px]">local_fire_department</span>
       </button>
       <button class="text-txt-muted hover:text-txt transition-colors" onclick="downloadSample(state.currentSample)">
         <span class="material-symbols-outlined text-[14px]">download</span>

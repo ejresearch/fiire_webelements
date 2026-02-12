@@ -29,6 +29,29 @@ const state = {
   selectedPad: null,
   currentBank: 'A',
   generatingForPad: null,
+
+  // Timeline / arrangement
+  timelineBPM: 120,
+  timelineSig: [4, 4],
+  timelineSnap: 'bar',
+  timelinePlaying: false,
+  timelineLooping: false,
+  timelineLoopStart: 0,
+  timelineLoopEnd: 16,
+  timelinePlayheadBeat: 0,
+  timelineScrollX: 0,
+  timelineScrollY: 0,
+  timelineZoom: 1,
+  selectedBlocks: new Set(),
+  selectedTrack: null,
+
+  // Base samples + sample bar
+  baseSamples: new Array(12).fill(null),
+  sampleBarIds: [],
+
+  // Inline generation
+  inlineGenSlot: null,
+  inlineGenVariations: [],
 };
 
 let samples = {};
@@ -44,6 +67,10 @@ let padAssignments = {
   'D': new Array(24).fill(null),
 };
 
+let arrangement = { tracks: [], blocks: [] };
+let blockIdCounter = 0;
+let trackIdCounter = 0;
+
 let dnaFiles = [];
 let dnaProfile = null;
 let globalDnaProfile = null;
@@ -54,14 +81,16 @@ let currentProjectId = null;
 // ==================== PERSISTENCE ====================
 function saveData() {
   try {
-    // Sync pads back to project before persisting
+    // Sync pads + arrangement back to project before persisting
     if (currentProjectId && projects[currentProjectId]) {
       projects[currentProjectId].padAssignments = padAssignments;
+      projects[currentProjectId].arrangement = arrangement;
+      projects[currentProjectId].baseSamples = state.baseSamples;
     }
     localStorage.setItem('fiire_samples', JSON.stringify(samples));
     localStorage.setItem('fiire_sessions', JSON.stringify(sessions));
     localStorage.setItem('fiire_decisions', JSON.stringify(decisions));
-    localStorage.setItem('fiire_counters', JSON.stringify({ varIdCounter }));
+    localStorage.setItem('fiire_counters', JSON.stringify({ varIdCounter, blockIdCounter, trackIdCounter }));
     localStorage.setItem('fiire_projects', JSON.stringify(projects));
     localStorage.setItem('fiire_current_project', currentProjectId);
   } catch(e) {}
@@ -72,7 +101,7 @@ function loadData() {
     const s = localStorage.getItem('fiire_samples'); if (s) samples = JSON.parse(s);
     const ss = localStorage.getItem('fiire_sessions'); if (ss) sessions = JSON.parse(ss);
     const d = localStorage.getItem('fiire_decisions'); if (d) decisions = JSON.parse(d);
-    const c = localStorage.getItem('fiire_counters'); if (c) { const p = JSON.parse(c); varIdCounter = p.varIdCounter || 0; }
+    const c = localStorage.getItem('fiire_counters'); if (c) { const p = JSON.parse(c); varIdCounter = p.varIdCounter || 0; blockIdCounter = p.blockIdCounter || 0; trackIdCounter = p.trackIdCounter || 0; }
     const pr = localStorage.getItem('fiire_projects'); if (pr) projects = JSON.parse(pr);
     const cp = localStorage.getItem('fiire_current_project'); if (cp) currentProjectId = cp;
     const pa = localStorage.getItem('fiire_pads'); if (pa) padAssignments = JSON.parse(pa);
@@ -90,6 +119,17 @@ function syncPadAssignments() {
     padAssignments = proj.padAssignments;
   } else {
     padAssignments = emptyPads();
+  }
+  // Sync arrangement + base samples
+  if (proj && proj.arrangement) {
+    arrangement = proj.arrangement;
+  } else {
+    arrangement = { tracks: [], blocks: [] };
+  }
+  if (proj && proj.baseSamples) {
+    state.baseSamples = proj.baseSamples;
+  } else {
+    state.baseSamples = new Array(12).fill(null);
   }
 }
 
@@ -576,6 +616,29 @@ function downloadSample(id) {
   });
 }
 
+// ==================== DRAG & DROP EXPORT ====================
+const dragBlobUrls = {};
+function handleSampleDrag(event, id) {
+  const s = samples[id];
+  if (!s) return;
+  ensureAudioContext();
+  const buf = audioBuffers[id];
+  if (!buf) {
+    event.preventDefault();
+    return;
+  }
+  const filename = sanitizeFilename(s.name) + '.wav';
+  // Create blob URL if not cached
+  if (!dragBlobUrls[id]) {
+    const wav = audioBufferToWav(buf);
+    const blob = new Blob([wav], { type: 'audio/wav' });
+    dragBlobUrls[id] = URL.createObjectURL(blob);
+  }
+  // Chrome DownloadURL format for native drag-to-desktop/DAW
+  event.dataTransfer.setData('DownloadURL', 'audio/wav:' + filename + ':' + dragBlobUrls[id]);
+  event.dataTransfer.effectAllowed = 'copy';
+}
+
 // ==================== PROJECTS ====================
 let projectDropdownOpen = false;
 
@@ -763,6 +826,22 @@ function navigateTo(page) {
 
   // Navigate to different page
   window.location.href = targetFile + (page === 'library' ? '#library' : '');
+}
+
+function openSampleInStudio(id) {
+  const s = samples[id];
+  if (!s) return;
+  const currentFile = window.location.pathname.split('/').pop() || 'index.html';
+  if (currentFile === 'studio.html') {
+    // Already on studio — open inspector + preview
+    if (typeof showStudioView === 'function') showStudioView('library');
+    previewSample(id);
+    openInspector(id);
+  } else {
+    // Store sample ID and navigate to studio
+    localStorage.setItem('fiire_open_sample', id);
+    window.location.href = 'studio.html#library';
+  }
 }
 
 function initNavHighlight() {
@@ -1201,15 +1280,15 @@ function renderLibrary(options) {
   } else {
     gridEl.classList.add('hidden'); listEl.classList.remove('hidden');
     document.getElementById('lib-tbody').innerHTML = list.map(s => `
-      <tr class="group hover:bg-surface/40 transition-colors cursor-pointer" onclick="previewSample('${s.id}')">
-        <td class="px-4 py-3" onclick="event.stopPropagation()"><input type="checkbox" class="rounded border-border" ${state.selectedSamples.has(s.id) ? 'checked' : ''} onchange="toggleSampleSelect('${s.id}')"/></td>
+      <tr class="group hover:bg-surface/40 transition-colors cursor-grab" draggable="true" ondragstart="handleSampleDrag(event, '${s.id}')" onclick="previewSample('${s.id}')">
+
         <td class="px-4 py-3"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded bg-bg overflow-hidden"><canvas class="lib-waveform-row w-full h-full" data-id="${s.id}" width="40" height="40"></canvas></div><span class="font-bold text-sm">${s.name}</span></div></td>
         <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${s.type === 'loop' ? 'badge-loop' : 'badge-oneshot'}">${s.type}</span></td>
         <td class="px-4 py-3 text-sm text-txt-muted">${s.key || '-'}</td>
         <td class="px-4 py-3 text-sm text-txt-muted">${s.bpm || '-'}</td>
         <td class="px-4 py-3 text-sm text-txt-muted font-mono">${formatTime(s.duration)}</td>
         <td class="px-4 py-3 text-right"><div class="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button class="p-1.5 hover:bg-dk-gray rounded text-txt-muted hover:text-brand" onclick="event.stopPropagation(); toggleSampleFavorite('${s.id}')"><span class="material-symbols-outlined text-[18px] ${s.isFavorite ? 'fill-1 text-brand' : ''}">favorite</span></button>
+          <button class="p-1.5 hover:bg-dk-gray rounded text-txt-muted hover:text-brand" onclick="event.stopPropagation(); toggleSampleFavorite('${s.id}')"><span class="material-symbols-outlined text-[18px] ${s.isFavorite ? 'fill-1 text-brand' : ''}">local_fire_department</span></button>
           <button class="p-1.5 hover:bg-dk-gray rounded text-txt-muted" onclick="event.stopPropagation(); downloadSample('${s.id}')"><span class="material-symbols-outlined text-[18px]">download</span></button>
           <button class="p-1.5 hover:bg-dk-gray rounded text-txt-muted" onclick="event.stopPropagation(); deleteSampleConfirm('${s.id}')"><span class="material-symbols-outlined text-[18px]">delete</span></button>
         </div></td>
@@ -1228,8 +1307,8 @@ function renderSampleCard(s, options) {
   const meta = buildSampleMeta(s, ' / ');
   const projBadge = options?.global ? '<span class="text-[9px] text-txt-dim">' + (projects[s.projectId]?.name || '') + '</span>' : '';
   return `
-    <div class="sample-card group bg-panel p-3 rounded border border-border cursor-pointer ${state.selectedSamples.has(s.id) ? 'selected' : ''}"
-         data-id="${s.id}" onclick="previewSample('${s.id}')">
+    <div class="sample-card group bg-panel p-3 rounded border border-border cursor-grab ${state.selectedSamples.has(s.id) ? 'selected' : ''}"
+         data-id="${s.id}" draggable="true" onclick="previewSample('${s.id}')" ondblclick="openSampleInStudio('${s.id}')" ondragstart="handleSampleDrag(event, '${s.id}')"">
       <div class="relative rounded overflow-hidden mb-3 bg-bg h-24">
         <canvas class="lib-waveform w-full h-full" data-id="${s.id}"></canvas>
         <div class="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1247,10 +1326,29 @@ function renderSampleCard(s, options) {
           ${projBadge}
         </div>
         <button class="p-1.5 text-txt-muted hover:text-brand flex-shrink-0" onclick="event.stopPropagation(); toggleSampleFavorite('${s.id}')">
-          <span class="material-symbols-outlined text-[18px] ${s.isFavorite ? 'fill-1 text-brand' : ''}">favorite</span>
+          <span class="material-symbols-outlined text-[18px] ${s.isFavorite ? 'fill-1 text-brand' : ''}">local_fire_department</span>
         </button>
       </div>
     </div>`;
+}
+
+function toggleFilterPopover(e) {
+  e.stopPropagation();
+  const pop = document.getElementById('lib-filter-popover');
+  pop.classList.toggle('open');
+  if (pop.classList.contains('open')) {
+    const close = (ev) => { if (!pop.contains(ev.target)) { pop.classList.remove('open'); document.removeEventListener('click', close); } };
+    setTimeout(() => document.addEventListener('click', close), 0);
+  }
+}
+
+function updateFilterDot() {
+  const key = document.getElementById('lib-key-filter')?.value;
+  const sort = document.getElementById('lib-sort')?.value;
+  const source = document.getElementById('lib-source-filter')?.value;
+  const active = (key && key !== 'all') || (sort && sort !== 'recent') || (source && source !== 'all');
+  const dot = document.getElementById('lib-filter-dot');
+  if (dot) dot.classList.toggle('active', active);
 }
 
 function setLibType(type, btn) {
@@ -1418,6 +1516,29 @@ function importSelectedSamples() {
   renderProjectSwitcher();
   showToast(`${count} sample${count !== 1 ? 's' : ''} imported!`);
 }
+
+// ==================== SIDEBAR TOGGLE ====================
+let sidebarVisible = true;
+function toggleSidebar() {
+  const sidebar = document.querySelector('aside.w-\\[200px\\]');
+  if (!sidebar) return;
+  sidebarVisible = !sidebarVisible;
+  if (sidebarVisible) {
+    sidebar.style.marginLeft = '0px';
+    sidebar.style.opacity = '1';
+  } else {
+    sidebar.style.marginLeft = '-200px';
+    sidebar.style.opacity = '0';
+  }
+}
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    // Don't toggle if a modal is open or Blaise is open
+    const modal = document.querySelector('.modal-overlay.open');
+    if (modal) return;
+    toggleSidebar();
+  }
+});
 
 // ==================== INIT ====================
 loadData();

@@ -391,6 +391,7 @@ function buildSoundProfile(analyses) {
     },
     trackCount: analyses.length,
     createdAt: Date.now(),
+    trackAnalyses: analyses,
   };
 }
 
@@ -417,20 +418,309 @@ function loadDnaProfile() {
 function renderDnaProfile() {
   if (!dnaProfile) return;
   document.getElementById('dna-profile-section').classList.remove('hidden');
+
+  // Title (click-to-edit)
   document.getElementById('dna-profile-title').textContent = dnaProfile.title;
   document.getElementById('dna-profile-subtitle').textContent = dnaProfile.subtitle;
-  document.getElementById('dna-bpm').textContent = dnaProfile.bpmRange.low + '\u2013' + dnaProfile.bpmRange.high + ' BPM (center: ' + dnaProfile.bpmRange.center + ')';
-  document.getElementById('dna-key').textContent = dnaProfile.dominantKey;
+
+  // Characteristic sliders
+  const pct = v => Math.round(v * 100);
+  document.getElementById('dna-characteristics').innerHTML = Object.entries(dnaProfile.characteristics).map(([name, value]) =>
+    '<div>' +
+      '<div class="flex justify-between text-[11px] mb-1.5">' +
+        '<span class="text-txt-muted font-medium">' + name + '</span>' +
+        '<span class="text-brand font-mono font-bold text-[10px]" id="dna-char-val-' + name.replace(/\s/g, '-') + '">' + pct(value) + '%</span>' +
+      '</div>' +
+      '<input type="range" min="0" max="100" value="' + pct(value) + '" ' +
+        'class="dna-char-slider" data-char="' + name + '" ' +
+        'style="background:linear-gradient(to right, #E85002 ' + pct(value) + '%, #3D3D3D ' + pct(value) + '%)" ' +
+        'oninput="updateDnaCharacteristic(\'' + name + '\', this.value)" />' +
+    '</div>'
+  ).join('');
+
+  // BPM display + inputs
+  const bpmDisplay = document.getElementById('dna-bpm-display');
+  if (bpmDisplay) bpmDisplay.textContent = dnaProfile.bpmRange.low + '–' + dnaProfile.bpmRange.high + ' (' + dnaProfile.bpmRange.center + ')';
+  const bpmLow = document.getElementById('dna-bpm-low');
+  const bpmHigh = document.getElementById('dna-bpm-high');
+  const bpmCenter = document.getElementById('dna-bpm-center');
+  if (bpmLow) bpmLow.value = dnaProfile.bpmRange.low;
+  if (bpmHigh) bpmHigh.value = dnaProfile.bpmRange.high;
+  if (bpmCenter) bpmCenter.value = dnaProfile.bpmRange.center;
+
+  // Key dropdown
+  populateDnaKeySelect();
+
+  // Energy & Texture labels
   document.getElementById('dna-energy').textContent = dnaProfile.energyLabel;
   document.getElementById('dna-texture').textContent = dnaProfile.brightness > 0.5 ? 'Bright' : dnaProfile.warmth > 0.5 ? 'Warm' : 'Balanced';
 
-  document.getElementById('dna-characteristics').innerHTML = Object.entries(dnaProfile.characteristics).map(([name, value]) =>
-    '<div><div class="flex justify-between text-xs mb-1"><span class="text-txt-muted font-medium">' + name + '</span><span class="text-txt-dim">' + Math.round(value * 100) + '%</span></div><div class="dna-bar"><div class="dna-bar-fill" style="width:' + (value * 100) + '%"></div></div></div>'
-  ).join('');
+  // Tags
+  renderDnaTags();
 
-  document.getElementById('dna-tags').innerHTML = dnaProfile.descriptors.map(d =>
-    '<span class="px-2.5 py-1 bg-brand/10 border border-brand/20 rounded text-xs text-brand font-medium">' + d + '</span>'
+  // Analyzed tracks
+  renderDnaAnalyzedTracks();
+}
+
+// ==================== EDITABLE TITLE ====================
+function startEditDnaTitle() {
+  const display = document.getElementById('dna-profile-title');
+  const input = document.getElementById('dna-title-input');
+  display.classList.add('hidden');
+  input.classList.remove('hidden');
+  input.value = dnaProfile.title;
+  input.focus();
+  input.select();
+}
+
+function commitDnaTitle() {
+  const display = document.getElementById('dna-profile-title');
+  const input = document.getElementById('dna-title-input');
+  const val = input.value.trim();
+  if (val && val !== dnaProfile.title) {
+    dnaProfile.title = val;
+    dnaProfile._customTitle = true;
+    saveDnaProfile();
+  }
+  display.textContent = dnaProfile.title;
+  input.classList.add('hidden');
+  display.classList.remove('hidden');
+}
+
+// ==================== CHARACTERISTIC SLIDERS ====================
+function updateDnaCharacteristic(name, value) {
+  const norm = parseInt(value) / 100;
+  dnaProfile.characteristics[name] = norm;
+
+  const valEl = document.getElementById('dna-char-val-' + name.replace(/\s/g, '-'));
+  if (valEl) valEl.textContent = Math.round(norm * 100) + '%';
+
+  // Update slider fill gradient
+  const slider = document.querySelector('.dna-char-slider[data-char="' + name + '"]');
+  if (slider) slider.style.background = 'linear-gradient(to right, #E85002 ' + value + '%, #3D3D3D ' + value + '%)';
+
+  if (name === 'Brightness') dnaProfile.brightness = norm;
+  if (name === 'Warmth') dnaProfile.warmth = norm;
+  if (name === 'Energy') {
+    dnaProfile.energy = norm;
+    dnaProfile.energyLabel = norm > 0.7 ? 'High' : norm > 0.4 ? 'Medium' : 'Low';
+    document.getElementById('dna-energy').textContent = dnaProfile.energyLabel;
+  }
+
+  document.getElementById('dna-texture').textContent =
+    dnaProfile.brightness > 0.5 ? 'Bright' : dnaProfile.warmth > 0.5 ? 'Warm' : 'Balanced';
+
+  regenerateDnaLabels();
+  saveDnaProfile();
+}
+
+// ==================== BPM EDITING ====================
+function toggleDnaBpmEdit() {
+  const display = document.getElementById('dna-bpm-display');
+  const edit = document.getElementById('dna-bpm-edit');
+  if (edit.classList.contains('hidden')) {
+    display.classList.add('hidden');
+    edit.classList.remove('hidden');
+    edit.classList.add('flex');
+    document.getElementById('dna-bpm-low').focus();
+  } else {
+    edit.classList.add('hidden');
+    edit.classList.remove('flex');
+    display.classList.remove('hidden');
+    updateDnaBpm();
+  }
+}
+
+function updateDnaBpm() {
+  const low = parseInt(document.getElementById('dna-bpm-low').value) || dnaProfile.bpmRange.low;
+  const high = parseInt(document.getElementById('dna-bpm-high').value) || dnaProfile.bpmRange.high;
+  const center = parseInt(document.getElementById('dna-bpm-center').value) || dnaProfile.bpmRange.center;
+  dnaProfile.bpmRange = { low: Math.min(low, high), high: Math.max(low, high), center };
+  const display = document.getElementById('dna-bpm-display');
+  if (display) display.textContent = dnaProfile.bpmRange.low + '–' + dnaProfile.bpmRange.high + ' (' + dnaProfile.bpmRange.center + ')';
+  regenerateDnaLabels();
+  saveDnaProfile();
+}
+
+// ==================== KEY EDITING ====================
+function populateDnaKeySelect() {
+  const select = document.getElementById('dna-key');
+  if (!select || select.tagName !== 'SELECT') return;
+  const keys = [];
+  NOTE_NAMES.forEach(n => { keys.push(n); keys.push(n + 'm'); });
+  select.innerHTML = keys.map(k =>
+    '<option value="' + k + '"' + (k === dnaProfile.dominantKey ? ' selected' : '') + '>' + k + '</option>'
   ).join('');
+}
+
+function updateDnaKey(key) {
+  dnaProfile.dominantKey = key;
+  dnaProfile.descriptors = dnaProfile.descriptors.filter(d => d !== 'Major' && d !== 'Minor');
+  dnaProfile.descriptors.push(key.endsWith('m') ? 'Minor' : 'Major');
+  regenerateDnaLabels();
+  saveDnaProfile();
+  renderDnaTags();
+}
+
+// ==================== DESCRIPTOR TAGS ====================
+function renderDnaTags() {
+  const container = document.getElementById('dna-tags');
+  if (!container) return;
+  container.innerHTML = dnaProfile.descriptors.map(d =>
+    '<span class="px-2 py-0.5 bg-brand/8 border border-brand/15 rounded text-[10px] text-brand/90 font-semibold inline-flex items-center gap-0.5 hover:bg-brand/12 transition-colors">' +
+      escapeHtml(d) +
+      '<button class="text-brand/30 hover:text-red-400 transition-colors" onclick="removeDnaTag(\'' + escapeHtml(d).replace(/'/g, "\\'") + '\')">' +
+        '<span class="material-symbols-outlined text-[10px]">close</span>' +
+      '</button>' +
+    '</span>'
+  ).join('');
+}
+
+function removeDnaTag(tag) {
+  dnaProfile.descriptors = dnaProfile.descriptors.filter(d => d !== tag);
+  renderDnaTags();
+  saveDnaProfile();
+}
+
+function addDnaTag(tag) {
+  tag = tag.trim();
+  if (!tag || dnaProfile.descriptors.includes(tag)) return;
+  dnaProfile.descriptors.push(tag);
+  renderDnaTags();
+  saveDnaProfile();
+  document.getElementById('dna-tag-input').value = '';
+}
+
+// ==================== ANALYZED TRACKS LIST ====================
+function renderDnaAnalyzedTracks() {
+  const list = document.getElementById('dna-analyzed-track-list');
+  if (!list) return;
+  if (!dnaProfile.trackAnalyses || !dnaProfile.trackAnalyses.length) {
+    list.innerHTML = '<p class="text-xs text-txt-dim">' + dnaProfile.trackCount + ' tracks analyzed</p>';
+    return;
+  }
+  list.innerHTML = dnaProfile.trackAnalyses.map((a, i) =>
+    '<div class="flex items-center gap-2 px-2 py-1.5 bg-surface rounded text-xs">' +
+      '<span class="material-symbols-outlined text-[14px] text-txt-dim">audio_file</span>' +
+      '<span class="text-txt-muted flex-1">Track ' + (i + 1) + '</span>' +
+      '<span class="text-txt-dim">' + Math.round(a.bpm.bpm) + ' BPM</span>' +
+      '<span class="text-txt-dim">' + a.key.key + '</span>' +
+      (dnaProfile.trackAnalyses.length > 2 ?
+        '<button class="text-txt-dim hover:text-red-400 transition-colors" onclick="removeDnaAnalyzedTrack(' + i + ')">' +
+          '<span class="material-symbols-outlined text-[14px]">close</span></button>' : '') +
+    '</div>'
+  ).join('');
+}
+
+function removeDnaAnalyzedTrack(index) {
+  if (!dnaProfile.trackAnalyses || dnaProfile.trackAnalyses.length <= 2) {
+    showToast('Need at least 2 tracks');
+    return;
+  }
+  const oldTitle = dnaProfile._customTitle ? dnaProfile.title : null;
+  dnaProfile.trackAnalyses.splice(index, 1);
+  const recomputed = buildSoundProfile(dnaProfile.trackAnalyses);
+  Object.assign(dnaProfile, recomputed);
+  if (oldTitle) { dnaProfile.title = oldTitle; dnaProfile._customTitle = true; }
+  saveDnaProfile();
+  renderDnaProfile();
+  showToast('Track removed, profile recalculated');
+}
+
+// ==================== ADD MORE TRACKS ====================
+function showAddTracksToProfile() {
+  document.getElementById('dna-upload-section').scrollIntoView({ behavior: 'smooth' });
+  const btn = document.getElementById('dna-analyze-btn');
+  btn.innerHTML = '<span class="material-symbols-outlined text-[18px]">merge</span> Merge into Profile';
+  btn.onclick = mergeNewTracks;
+  showToast('Upload additional tracks, then click Merge');
+}
+
+async function mergeNewTracks() {
+  const ready = dnaFiles.filter(d => d.status === 'ready' && d.buffer);
+  if (!ready.length) { showToast('Upload at least 1 track'); return; }
+
+  document.getElementById('dna-analysis-section').classList.remove('hidden');
+  const btn = document.getElementById('dna-analyze-btn');
+  btn.disabled = true;
+
+  for (let i = 0; i < ready.length; i++) {
+    updateDnaProgress(i, ready.length, 'Analyzing "' + ready[i].name + '"...');
+    try {
+      ready[i].analysis = await analyzeTrack(ready[i].buffer);
+      ready[i].status = 'analyzed';
+    } catch (e) {
+      ready[i].status = 'error';
+    }
+    renderDnaTrackList();
+  }
+
+  const newAnalyses = dnaFiles.filter(d => d.analysis).map(d => d.analysis);
+  if (!newAnalyses.length) {
+    showToast('No tracks could be analyzed');
+    btn.disabled = false;
+    return;
+  }
+
+  // Merge: combine existing trackAnalyses with new ones
+  const allAnalyses = [...(dnaProfile.trackAnalyses || []), ...newAnalyses];
+  const oldTitle = dnaProfile._customTitle ? dnaProfile.title : null;
+  const recomputed = buildSoundProfile(allAnalyses);
+  Object.assign(dnaProfile, recomputed);
+  if (oldTitle) { dnaProfile.title = oldTitle; dnaProfile._customTitle = true; }
+
+  saveDnaProfile();
+  renderDnaProfile();
+
+  // Reset button
+  btn.disabled = false;
+  btn.innerHTML = '<span class="material-symbols-outlined text-[18px]">analytics</span> Analyze My Sound';
+  btn.onclick = function() { analyzeDnaTracks(); };
+  document.getElementById('dna-analysis-section').classList.add('hidden');
+  dnaFiles.forEach(d => { d.buffer = null; });
+
+  showToast('Profile updated with ' + newAnalyses.length + ' new track' + (newAnalyses.length > 1 ? 's' : ''));
+}
+
+// ==================== RESET PROFILE ====================
+function resetDnaProfileConfirm() {
+  document.getElementById('confirm-title').textContent = 'Reset Sound DNA';
+  document.getElementById('confirm-msg').textContent = 'Delete your Sound DNA profile and start fresh? This cannot be undone.';
+  document.getElementById('confirm-action').onclick = function() {
+    dnaProfile = null;
+    dnaFiles = [];
+    if (dnaScope === 'global') {
+      globalDnaProfile = null;
+      localStorage.removeItem('fiire_dna_global');
+    } else if (currentProjectId) {
+      localStorage.removeItem('fiire_dna_' + currentProjectId);
+    }
+    document.getElementById('dna-profile-section').classList.add('hidden');
+    document.getElementById('dna-results-section').classList.add('hidden');
+    document.getElementById('dna-track-list').classList.add('hidden');
+    document.getElementById('dna-track-actions').classList.add('hidden');
+    renderDnaTrackList();
+    closeModal();
+    showToast('Sound DNA profile deleted');
+  };
+  document.getElementById('confirm-modal').classList.add('open');
+}
+
+// ==================== LABEL REGENERATION ====================
+function regenerateDnaLabels() {
+  const bpm = dnaProfile.bpmRange.center;
+  const tempoWord = bpm <= 90 ? 'Laid-Back' : bpm <= 120 ? 'Groovy' : bpm <= 140 ? 'Driving' : 'Fast';
+  const toneWord = dnaProfile.brightness > 0.5 ? 'Bright' : dnaProfile.warmth > 0.5 ? 'Warm' : 'Balanced';
+  const energyWord = dnaProfile.energy > 0.6 ? 'Powerful' : dnaProfile.energy > 0.3 ? 'Smooth' : 'Delicate';
+
+  if (!dnaProfile._customTitle) {
+    dnaProfile.title = tempoWord + ' ' + toneWord + ' ' + energyWord;
+    document.getElementById('dna-profile-title').textContent = dnaProfile.title;
+  }
+
+  dnaProfile.energyLabel = dnaProfile.energy > 0.7 ? 'High' : dnaProfile.energy > 0.4 ? 'Medium' : 'Low';
+  dnaProfile.subtitle = dnaProfile.bpmRange.center + ' BPM / ' + dnaProfile.dominantKey + ' / ' + dnaProfile.trackCount + ' tracks analyzed';
+  document.getElementById('dna-profile-subtitle').textContent = dnaProfile.subtitle;
 }
 
 function switchDnaScope(scope) {
@@ -479,6 +769,7 @@ function renderSoundDna() {
   }
   renderDnaTrackList();
   initDnaDropZone();
+  renderDnaPreviousPacks();
 }
 
 // ==================== PROMPT CONSTRUCTION ====================
@@ -513,6 +804,14 @@ function calcDnaDuration(profile, category) {
 }
 
 // ==================== PACK GENERATION ====================
+function getDnaPackNumber() {
+  let max = 0;
+  Object.values(sessions).forEach(s => {
+    if (s.type === 'dna-pack' && s.packNumber) max = Math.max(max, s.packNumber);
+  });
+  return max + 1;
+}
+
 async function generateDnaPack() {
   const activeProfile = dnaProfile || (dnaScope === 'project' ? globalDnaProfile : null);
   if (!activeProfile) { showToast('Analyze tracks first'); return; }
@@ -528,6 +827,11 @@ async function generateDnaPack() {
   document.getElementById('dna-results-actions').classList.add('hidden');
   document.getElementById('dna-generate-btn').disabled = true;
   document.getElementById('dna-generate-btn').classList.add('opacity-50');
+
+  const packNum = getDnaPackNumber();
+  const packName = 'Sound DNA ' + packNum;
+  const packPrefix = 'SD' + packNum;
+  document.getElementById('dna-pack-title').textContent = packName;
 
   const sessionId = uid('ses');
   const allIds = [];
@@ -546,12 +850,12 @@ async function generateDnaPack() {
 
       samples[id] = {
         id, type: category.type,
-        name: 'DNA ' + category.name + ' ' + (i + 1),
+        name: packPrefix + ' ' + category.name + ' ' + (i + 1),
         status: 'pending', duration: Math.round(duration * 100) / 100,
         bpm: isLoop ? dnaProfile.bpmRange.center : null, key: dnaProfile.dominantKey,
         bars: isLoop ? 4 : null, tuning: null, attack: null, timbre: null,
         style: dnaProfile.descriptors.slice(0, 3),
-        tags: ['Sound DNA', category.name, ...dnaProfile.descriptors.slice(0, 2)],
+        tags: [packName, category.name, ...dnaProfile.descriptors.slice(0, 2)],
         notes: 'Generated from Sound DNA profile: ' + dnaProfile.title,
         effects: {}, generationSessionId: sessionId, variationIndex: i,
         parentSampleId: null, modelVersion: 'ElevenLabs SFX v2',
@@ -567,7 +871,7 @@ async function generateDnaPack() {
   }
 
   sessions[sessionId] = {
-    id: sessionId, type: 'dna-pack',
+    id: sessionId, type: 'dna-pack', packNumber: packNum, packName: packName,
     params: { type: 'dna-pack', profile: dnaProfile.title, bpm: dnaProfile.bpmRange.center, key: dnaProfile.dominantKey, styles: dnaProfile.descriptors },
     variationIds: allIds, acceptedCount: 0, rejectedCount: 0,
     createdAt: Date.now(), projectId: currentProjectId,
@@ -622,6 +926,7 @@ function finishDnaGeneration(failed) {
   document.getElementById('dna-generate-btn').disabled = false;
   document.getElementById('dna-generate-btn').classList.remove('opacity-50');
   renderDnaResults();
+  renderDnaPreviousPacks();
   const total = dnaCategoryResults.reduce((s, c) => s + c.ids.length, 0);
   showToast(failed > 0 ? 'Generated ' + (total - failed) + ' samples (' + failed + ' fell back to synthetic)' : 'Your Sound DNA pack is ready!');
 }
@@ -685,6 +990,53 @@ function acceptAllDnaSamples() {
   });
   saveData(); renderDnaResults();
   showToast(count + ' samples accepted & added to library!');
+}
+
+// ==================== PREVIOUS PACKS ====================
+function renderDnaPreviousPacks() {
+  const container = document.getElementById('dna-previous-packs');
+  if (!container) return;
+
+  // Find all dna-pack sessions except the currently displayed one
+  const currentSessionId = dnaCategoryResults.length > 0 && dnaCategoryResults[0].ids.length > 0
+    ? samples[dnaCategoryResults[0].ids[0]]?.generationSessionId : null;
+
+  const packSessions = Object.values(sessions)
+    .filter(s => s.type === 'dna-pack' && s.id !== currentSessionId)
+    .sort((a, b) => b.createdAt - a.createdAt);
+
+  if (!packSessions.length) { container.innerHTML = ''; return; }
+
+  container.innerHTML = packSessions.map(session => {
+    const name = session.packName || 'Sound DNA Pack';
+    const date = new Date(session.createdAt).toLocaleDateString();
+    const sampleList = (session.variationIds || []).filter(id => samples[id]);
+    const accepted = sampleList.filter(id => samples[id]?.status === 'accepted').length;
+
+    const sampleRows = sampleList.map(id => {
+      const s = samples[id];
+      if (!s) return '';
+      const isPlaying = state.currentSample === id && state.isPlaying;
+      return '<div class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface/50 rounded transition-colors">' +
+        '<button class="w-6 h-6 rounded bg-surface flex items-center justify-center flex-shrink-0 hover:bg-dk-gray transition-colors" onclick="previewSample(\'' + id + '\')">' +
+          '<span class="material-symbols-outlined text-[14px] ' + (isPlaying ? 'text-brand fill-1' : 'text-txt-dim') + '">' + (isPlaying ? 'pause' : 'play_arrow') + '</span>' +
+        '</button>' +
+        '<span class="text-[11px] text-txt-muted flex-1 truncate">' + s.name + '</span>' +
+        '<span class="px-1 py-0.5 rounded text-[8px] font-bold uppercase ' + (s.type === 'loop' ? 'badge-loop' : 'badge-oneshot') + '">' + s.type + '</span>' +
+        '<span class="material-symbols-outlined text-[14px] ' + (s.status === 'accepted' ? 'text-emerald-400 fill-1' : 'text-txt-dim') + '">check_circle</span>' +
+      '</div>';
+    }).join('');
+
+    return '<div class="border-t border-border pt-3 mt-3">' +
+      '<button class="flex items-center gap-2 w-full text-left group" onclick="const el=this.nextElementSibling; const icon=this.querySelector(\'.material-symbols-outlined\'); el.classList.toggle(\'hidden\'); icon.textContent=el.classList.contains(\'hidden\')?\'expand_more\':\'expand_less\';">' +
+        '<span class="material-symbols-outlined text-[14px] text-txt-dim">expand_more</span>' +
+        '<span class="text-xs font-bold">' + name + '</span>' +
+        '<span class="text-[10px] text-txt-dim">' + date + '</span>' +
+        '<span class="text-[10px] text-txt-dim ml-auto">' + accepted + '/' + sampleList.length + ' accepted</span>' +
+      '</button>' +
+      '<div class="hidden mt-2 space-y-0.5">' + sampleRows + '</div>' +
+    '</div>';
+  }).join('');
 }
 
 // ==================== PAGE CALLBACKS ====================

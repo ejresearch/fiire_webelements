@@ -94,16 +94,16 @@ tailwind.config = {
       <span class="material-symbols-outlined text-[16px]">music_note</span>
       <span class="text-[11px] font-medium uppercase tracking-wide">Studio</span>
     </a>
+    <button onclick="openSettingsModal()" class="nav-link flex items-center gap-2 px-2 py-1 w-full text-left">
+      <span class="material-symbols-outlined text-[16px]">settings</span>
+      <span class="text-[11px] font-medium uppercase tracking-wide">Settings</span>
+    </button>
   </nav>
-  <div class="p-2 border-t border-border space-y-1">
+  <div class="p-2 border-t border-border">
     <a href="studio.html" class="w-full flex items-center justify-center gap-1 py-1.5 bg-brand hover:bg-brand-hover text-txt font-bold text-[11px] uppercase transition-all">
       <span class="material-symbols-outlined text-[14px]">add</span>
       New Session
     </a>
-    <button onclick="openSettingsModal()" class="w-full flex items-center gap-2 px-2 py-1 text-txt-muted hover:text-txt hover:bg-surface transition-colors">
-      <span class="material-symbols-outlined text-[14px]">settings</span>
-      <span class="text-[11px]">Settings</span>
-    </button>
   </div>
 </aside>
 
@@ -130,36 +130,39 @@ tailwind.config = {
 
   <div class="flex-1 overflow-y-auto px-8 pb-28">
     <!-- STEP 1: Upload Zone -->
-    <div id="dna-upload-section" class="mb-8">
-      <h3 class="text-lg font-bold mb-3">1. Upload Your Tracks</h3>
-      <p class="text-sm text-txt-muted mb-4">Drop 2–10 tracks (WAV or MP3) that represent your sound. More tracks = better profile.</p>
-
-      <div id="dna-drop-zone" class="border-2 border-dashed border-border rounded p-12 text-center hover:border-brand transition-colors cursor-pointer relative"
-           onclick="document.getElementById('dna-file-input').click()">
-        <input id="dna-file-input" type="file" accept="audio/wav,audio/mp3,audio/mpeg,audio/x-wav" multiple class="hidden" onchange="handleDnaFileSelect(this)"/>
-        <span class="material-symbols-outlined text-5xl text-txt-dim mb-3 block">cloud_upload</span>
-        <p class="text-txt-muted font-medium text-lg">Drop tracks here or click to browse</p>
-        <p class="text-txt-dim text-sm mt-1">WAV or MP3, up to 10 files</p>
+    <div id="dna-upload-section" class="mb-6">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-bold">Upload Your Tracks</h3>
+        <span class="text-[10px] text-txt-dim">WAV or MP3, 2–10 files</span>
       </div>
 
-      <div id="dna-track-list" class="hidden mt-4 space-y-2"></div>
-      <div id="dna-track-actions" class="hidden mt-3 flex items-center justify-between">
-        <span class="text-sm text-txt-muted"><span id="dna-track-count">0</span> tracks loaded</span>
-        <div class="flex gap-3">
-          <button class="text-sm text-red-400 hover:text-red-300" onclick="clearDnaTracks()">Clear All</button>
-          <button id="dna-analyze-btn" class="bg-brand hover:bg-brand-hover text-txt font-bold px-6 py-2.5 rounded flex items-center gap-2 text-sm transition-all"
+      <div id="dna-drop-zone" class="border border-dashed border-border rounded px-6 py-5 text-center hover:border-brand transition-colors cursor-pointer relative flex items-center justify-center gap-3"
+           onclick="document.getElementById('dna-file-input').click()">
+        <input id="dna-file-input" type="file" accept="audio/wav,audio/mp3,audio/mpeg,audio/x-wav" multiple class="hidden" onchange="handleDnaFileSelect(this)"/>
+        <span class="material-symbols-outlined text-2xl text-txt-dim">cloud_upload</span>
+        <div>
+          <p class="text-txt-muted font-medium text-sm">Drop tracks here or click to browse</p>
+          <p class="text-txt-dim text-[10px]">More tracks = better profile</p>
+        </div>
+      </div>
+
+      <div id="dna-track-list" class="hidden mt-3 space-y-1.5"></div>
+      <div id="dna-track-actions" class="hidden mt-2 flex items-center justify-between">
+        <span class="text-xs text-txt-muted"><span id="dna-track-count">0</span> tracks loaded</span>
+        <div class="flex gap-2">
+          <button class="text-xs text-red-400 hover:text-red-300" onclick="clearDnaTracks()">Clear</button>
+          <button id="dna-analyze-btn" class="bg-brand hover:bg-brand-hover text-white font-bold px-4 py-1.5 rounded flex items-center gap-1.5 text-xs transition-all"
                   onclick="analyzeDnaTracks()">
-            <span class="material-symbols-outlined text-[18px]">analytics</span> Analyze My Sound
+            <span class="material-symbols-outlined text-[14px]">analytics</span> Analyze
           </button>
         </div>
       </div>
     </div>
 
     <!-- STEP 2: Analysis Progress -->
-    <div id="dna-analysis-section" class="hidden mb-8">
-      <h3 class="text-lg font-bold mb-3">2. Analyzing Your Sound</h3>
-      <div id="dna-progress-container" class="bg-panel border border-border rounded p-6 dna-analyzing">
-        <div id="dna-progress-tracks" class="space-y-3"></div>
+    <div id="dna-analysis-section" class="hidden mb-6">
+      <div id="dna-progress-container" class="bg-panel border border-border rounded p-4 dna-analyzing">
+        <div id="dna-progress-tracks" class="space-y-2"></div>
         <div class="mt-4">
           <div class="flex justify-between text-xs text-txt-muted mb-1">
             <span id="dna-progress-label">Analyzing...</span>
@@ -173,86 +176,131 @@ tailwind.config = {
     </div>
 
     <!-- STEP 3: Sound Profile Display -->
-    <div id="dna-profile-section" class="hidden mb-8">
-      <h3 class="text-lg font-bold mb-3">3. Your Sound Profile</h3>
+    <div id="dna-profile-section" class="hidden mb-6">
       <div class="bg-panel border border-border rounded p-6">
-        <div class="flex items-center gap-4 mb-6">
-          <div class="w-20 h-20 rounded bg-brand/15 flex items-center justify-center flex-shrink-0">
-            <span class="material-symbols-outlined text-brand text-4xl">fingerprint</span>
+        <!-- Profile header -->
+        <div class="flex items-center gap-4 mb-5">
+          <div class="w-14 h-14 rounded bg-brand/10 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-brand text-3xl">fingerprint</span>
           </div>
-          <div>
-            <h4 id="dna-profile-title" class="text-xl font-bold"></h4>
-            <p id="dna-profile-subtitle" class="text-sm text-txt-muted"></p>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 group/title">
+              <h4 id="dna-profile-title" class="text-lg font-bold cursor-pointer hover:text-brand transition-colors" onclick="startEditDnaTitle()" title="Click to edit"></h4>
+              <span class="material-symbols-outlined text-[14px] text-txt-dim opacity-0 group-hover/title:opacity-100 transition-opacity">edit</span>
+            </div>
+            <input id="dna-title-input" class="hidden text-lg font-bold bg-bg border border-brand px-2 py-0.5 rounded text-txt w-full max-w-sm" onblur="commitDnaTitle()" onkeydown="if(event.key==='Enter')commitDnaTitle(); if(event.key==='Escape'){this.classList.add('hidden'); document.getElementById('dna-profile-title').classList.remove('hidden');}" />
+            <p id="dna-profile-subtitle" class="text-xs text-txt-muted mt-0.5"></p>
+          </div>
+          <div class="flex items-center gap-1.5 flex-shrink-0">
+            <button class="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-txt-dim hover:text-txt hover:bg-surface rounded transition-colors" onclick="showAddTracksToProfile()">
+              <span class="material-symbols-outlined text-[13px]">add</span> Add Tracks
+            </button>
+            <button class="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-txt-dim hover:text-red-400 hover:bg-red-500/5 rounded transition-colors" onclick="resetDnaProfileConfirm()">
+              <span class="material-symbols-outlined text-[13px]">restart_alt</span> Reset
+            </button>
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-6 mb-6">
-          <div id="dna-characteristics" class="space-y-3"></div>
-          <div>
-            <div class="space-y-3">
-              <div class="flex items-center gap-3">
-                <span class="text-xs text-txt-dim uppercase font-bold w-20">BPM Range</span>
-                <span id="dna-bpm" class="text-sm font-bold text-brand"></span>
-              </div>
-              <div class="flex items-center gap-3">
-                <span class="text-xs text-txt-dim uppercase font-bold w-20">Key</span>
-                <span id="dna-key" class="text-sm font-bold text-brand"></span>
-              </div>
-              <div class="flex items-center gap-3">
-                <span class="text-xs text-txt-dim uppercase font-bold w-20">Energy</span>
-                <span id="dna-energy" class="text-sm font-bold text-brand"></span>
-              </div>
-              <div class="flex items-center gap-3">
-                <span class="text-xs text-txt-dim uppercase font-bold w-20">Texture</span>
-                <span id="dna-texture" class="text-sm font-bold text-brand"></span>
-              </div>
-            </div>
-            <div class="mt-4">
-              <span class="text-[10px] text-txt-dim uppercase font-bold tracking-wider">Descriptors</span>
-              <div id="dna-tags" class="flex flex-wrap gap-1.5 mt-2"></div>
+        <!-- Stats row (inline) -->
+        <div class="flex items-center gap-6 mb-5 py-3 px-4 bg-bg rounded border border-border/50">
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] text-txt-dim uppercase font-bold tracking-wider">BPM</span>
+            <span id="dna-bpm-display" class="text-sm font-bold text-brand cursor-pointer hover:text-brand-hover transition-colors" onclick="toggleDnaBpmEdit()"></span>
+            <div id="dna-bpm-edit" class="hidden items-center gap-1">
+              <input id="dna-bpm-low" type="text" inputmode="numeric" maxlength="3" class="w-8 bg-surface border border-border rounded text-center text-xs font-bold text-brand px-1 py-0.5 font-mono focus:border-brand outline-none" oninput="updateDnaBpm()" />
+              <span class="text-txt-dim text-[10px]">&ndash;</span>
+              <input id="dna-bpm-high" type="text" inputmode="numeric" maxlength="3" class="w-8 bg-surface border border-border rounded text-center text-xs font-bold text-brand px-1 py-0.5 font-mono focus:border-brand outline-none" oninput="updateDnaBpm()" />
+              <span class="text-[9px] text-txt-dim mx-0.5">avg</span>
+              <input id="dna-bpm-center" type="text" inputmode="numeric" maxlength="3" class="w-8 bg-surface border border-border rounded text-center text-xs font-bold text-txt-muted px-1 py-0.5 font-mono focus:border-brand outline-none" oninput="updateDnaBpm()" />
+              <button class="text-txt-dim hover:text-txt ml-0.5" onclick="toggleDnaBpmEdit()"><span class="material-symbols-outlined text-[12px]">check</span></button>
             </div>
           </div>
+          <div class="w-px h-4 bg-border"></div>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] text-txt-dim uppercase font-bold tracking-wider">Key</span>
+            <select id="dna-key" class="bg-transparent text-sm font-bold text-brand cursor-pointer outline-none border-none p-0 pr-4" style="-webkit-appearance:none" onchange="updateDnaKey(this.value)"></select>
+          </div>
+          <div class="w-px h-4 bg-border"></div>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] text-txt-dim uppercase font-bold tracking-wider">Energy</span>
+            <span id="dna-energy" class="text-sm font-bold text-brand"></span>
+          </div>
+          <div class="w-px h-4 bg-border"></div>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] text-txt-dim uppercase font-bold tracking-wider">Texture</span>
+            <span id="dna-texture" class="text-sm font-bold text-brand"></span>
+          </div>
+        </div>
+
+        <!-- Characteristic sliders (2 columns) -->
+        <div class="mb-5">
+          <span class="section-label block mb-3">Characteristics</span>
+          <div id="dna-characteristics" class="grid grid-cols-2 gap-x-8 gap-y-3"></div>
+        </div>
+
+        <!-- Descriptor tags -->
+        <div class="mb-4">
+          <span class="section-label block mb-2">Descriptors</span>
+          <div class="flex flex-wrap items-center gap-1.5">
+            <div id="dna-tags" class="contents"></div>
+            <div class="inline-flex items-center gap-1">
+              <input id="dna-tag-input" type="text" class="ab-input px-2 py-0.5 text-[10px] w-20 placeholder:text-txt-dim" placeholder="+ tag" onkeydown="if(event.key==='Enter'){addDnaTag(this.value);}" onfocus="this.style.width='100px'" onblur="this.style.width='80px'" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Analyzed tracks (collapsible) -->
+        <div class="mb-2">
+          <button class="section-label flex items-center gap-1 cursor-pointer hover:text-txt-muted transition-colors" onclick="const list=document.getElementById('dna-analyzed-track-list'); const icon=this.querySelector('.material-symbols-outlined'); list.classList.toggle('hidden'); icon.textContent=list.classList.contains('hidden')?'expand_more':'expand_less';">
+            <span class="material-symbols-outlined text-[14px] text-txt-dim">expand_more</span>
+            Analyzed Tracks
+          </button>
+          <div id="dna-analyzed-track-list" class="space-y-1 mt-2 hidden"></div>
         </div>
 
         <div class="border-t border-border pt-4 flex items-center justify-between">
           <div>
-            <p class="text-sm font-bold">Generate your personalized sample pack</p>
-            <p class="text-xs text-txt-muted">16 samples across drums, bass, melodic, and textures</p>
+            <p class="text-[13px] font-bold">Generate your personalized sample pack</p>
+            <p class="text-[10px] text-txt-dim mt-0.5">16 samples across drums, bass, melodic, and textures</p>
           </div>
-          <button id="dna-generate-btn" class="bg-brand hover:bg-brand-hover text-txt font-bold px-8 py-3 rounded flex items-center gap-2 text-base transition-all"
+          <button id="dna-generate-btn" class="bg-brand hover:bg-brand-hover text-white font-bold px-6 py-2 rounded flex items-center gap-2 text-sm transition-all hover:shadow-lg hover:shadow-brand/20"
                   onclick="generateDnaPack()">
-            <span class="material-symbols-outlined text-xl">auto_awesome</span> Generate My Pack
+            <span class="material-symbols-outlined text-[18px]">auto_awesome</span> Generate My Pack
           </button>
         </div>
 
-        <!-- Pack Results -->
+        <!-- Pack Results (current generation) -->
         <div id="dna-results-section" class="hidden mt-4 border-t border-border pt-4">
-          <h4 class="text-sm font-bold mb-3">Your Sound DNA Pack</h4>
+          <div class="flex items-center justify-between mb-3">
+            <h4 id="dna-pack-title" class="text-sm font-bold">Sound DNA 1</h4>
+            <div id="dna-results-actions" class="hidden flex items-center gap-2">
+              <button class="bg-emerald-500/15 text-emerald-400 font-bold px-3 py-1 text-[10px] hover:bg-emerald-500/25 transition-colors flex items-center gap-1 rounded"
+                      onclick="acceptAllDnaSamples()">
+                <span class="material-symbols-outlined text-[12px]">check_circle</span> Accept All
+              </button>
+              <button class="bg-surface border border-border text-txt font-bold px-3 py-1 text-[10px] hover:bg-dk-gray transition-colors flex items-center gap-1 rounded"
+                      onclick="navigateTo('library')">
+                <span class="material-symbols-outlined text-[12px]">library_music</span> Library
+              </button>
+            </div>
+          </div>
 
-          <div id="dna-gen-loading" class="hidden flex items-center gap-2 py-3">
+          <div id="dna-gen-loading" class="hidden flex items-center gap-2 py-2">
             <div class="flex items-end gap-[1px]">
               <span class="gen-loading-bar"></span><span class="gen-loading-bar"></span><span class="gen-loading-bar"></span>
               <span class="gen-loading-bar"></span><span class="gen-loading-bar"></span><span class="gen-loading-bar"></span>
             </div>
             <div>
-              <p class="text-txt-muted text-[11px]">Generating your personalized pack...</p>
+              <p class="text-txt-muted text-[11px]">Generating...</p>
               <p id="dna-gen-progress" class="text-txt-dim text-[10px]">0 of 16 samples</p>
             </div>
           </div>
 
           <div id="dna-results-grid" class="space-y-4"></div>
-
-          <div id="dna-results-actions" class="hidden mt-4 flex items-center gap-2">
-            <button class="bg-emerald-500/15 text-emerald-400 font-bold px-4 py-1.5 text-[11px] hover:bg-emerald-500/25 transition-colors flex items-center gap-1.5"
-                    onclick="acceptAllDnaSamples()">
-              <span class="material-symbols-outlined text-[14px]">check_circle</span> Accept All to Library
-            </button>
-            <button class="bg-surface border border-border text-txt font-bold px-4 py-1.5 text-[11px] hover:bg-dk-gray transition-colors flex items-center gap-1.5"
-                    onclick="navigateTo('library')">
-              <span class="material-symbols-outlined text-[14px]">library_music</span> Go to Library
-            </button>
-          </div>
         </div>
+
+        <!-- Previous packs -->
+        <div id="dna-previous-packs" class="mt-4"></div>
       </div>
     </div>
   </div>
@@ -285,7 +333,7 @@ tailwind.config = {
     </div>
     <div class="flex items-center gap-2 flex-shrink-0">
       <button id="player-fav-btn" class="text-txt-muted hover:text-brand transition-colors" onclick="togglePlayerFav()">
-        <span class="material-symbols-outlined text-[14px]">favorite</span>
+        <span class="material-symbols-outlined text-[14px]">local_fire_department</span>
       </button>
       <button class="text-txt-muted hover:text-txt transition-colors" onclick="downloadSample(state.currentSample)">
         <span class="material-symbols-outlined text-[14px]">download</span>

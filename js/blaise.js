@@ -180,6 +180,7 @@ const bubbleHTML = `
   <span class="material-symbols-outlined text-[20px] fill-1">auto_awesome</span>
 </div>
 <div id="blaise-panel" class="blaise-panel">
+  <div class="blaise-resize-handle" id="blaise-resize"></div>
   <div class="flex items-center justify-between px-3 py-2 border-b border-border bg-panel">
     <div class="flex items-center gap-1.5">
       <span class="material-symbols-outlined text-brand text-[14px]">auto_awesome</span>
@@ -199,10 +200,10 @@ const bubbleHTML = `
     </div>
     <span class="text-txt-muted text-[10px]">Thinking...</span>
   </div>
-  <div class="flex items-center border-t border-border bg-panel">
-    <input id="blaise-input" class="flex-1 bg-transparent px-3 py-2 text-[11px] text-txt placeholder:text-txt-dim focus:outline-none" placeholder="Ask Blaise..." type="text"
+  <div class="flex items-center gap-2 px-3 py-2 border-t border-border bg-panel">
+    <input id="blaise-input" class="flex-1 bg-[#1A1A1A] border border-[#3D3D3D] rounded-full px-3 py-1 text-[11px] text-txt placeholder:text-txt-dim focus:outline-none focus:border-[#E85002]" placeholder="Ask Blaise..." type="text"
            onkeydown="if(event.key==='Enter') window._blazeSend()"/>
-    <button id="blaise-send-btn" class="bg-brand hover:bg-brand-hover text-txt font-bold px-3 py-2 text-[10px] transition-all flex items-center flex-shrink-0 self-stretch" onclick="window._blazeSend()">
+    <button id="blaise-send-btn" class="bg-brand hover:bg-brand-hover text-txt font-bold w-7 h-7 rounded-full text-[10px] transition-all flex items-center justify-center flex-shrink-0" onclick="window._blazeSend()">
       <span class="material-symbols-outlined text-[12px]">send</span>
     </button>
   </div>
@@ -238,7 +239,7 @@ function renderMessages() {
   container.innerHTML = blazeMessages.map((msg, msgIndex) => {
     if (msg.role === 'user') {
       return `<div class="flex justify-end mb-2">
-        <div class="max-w-[85%] bg-surface border border-border px-3 py-1.5">
+        <div class="max-w-[85%] bg-surface border border-border px-3 py-1.5 rounded-full">
           <p class="text-[10px] text-txt">${escapeHtml(msg.content)}</p>
         </div>
       </div>`;
@@ -254,62 +255,39 @@ function renderMessages() {
           const gen = blazeGeneratedSamples[key];
           const pJson = escapeHtml(JSON.stringify(p));
 
-          let playerHtml = '';
+          const shortName = (p.text || 'Sample').slice(0, 30) + ((p.text || '').length > 30 ? '...' : '');
+
           if (gen && gen.status === 'generating') {
-            playerHtml = `
-              <div class="flex items-center gap-2 mt-1.5 px-2 py-1.5 bg-black/20 border border-border/50 rounded">
-                <div class="flex items-end gap-[1px]">
-                  <span class="gen-loading-bar" style="height:10px"></span><span class="gen-loading-bar" style="height:10px"></span><span class="gen-loading-bar" style="height:10px"></span>
-                </div>
-                <span class="text-[9px] text-txt-muted">Generating...</span>
-              </div>`;
+            return `<div class="inline-flex items-center gap-1.5 mt-1 mb-0.5 px-2 py-1 bg-bg border border-border/50 rounded-full">
+              <div class="flex items-end gap-[1px]"><span class="gen-loading-bar" style="height:8px;width:1.5px"></span><span class="gen-loading-bar" style="height:8px;width:1.5px"></span><span class="gen-loading-bar" style="height:8px;width:1.5px"></span></div>
+              <span class="text-[9px] text-txt-muted truncate">${escapeHtml(shortName)}</span>
+            </div>`;
           } else if (gen && gen.status === 'ready') {
             const s = samples[gen.sampleId];
-            playerHtml = `
-              <div class="flex items-center gap-2 mt-1.5 px-2 py-1.5 bg-black/20 border border-brand/20 rounded">
-                <button class="w-6 h-6 bg-brand rounded flex items-center justify-center flex-shrink-0 hover:bg-brand-hover transition-colors" onclick="window._blazePlay('${gen.sampleId}')">
-                  <span class="material-symbols-outlined text-[14px] fill-1 text-txt">play_arrow</span>
-                </button>
-                <div class="flex-1 min-w-0">
-                  <p class="text-[9px] text-txt font-medium truncate">${s ? escapeHtml(s.name) : 'Sample'}</p>
-                  <p class="text-[8px] text-txt-dim">${s ? formatTime(s.duration) : ''} ${p.mode || ''}</p>
-                </div>
-                <span class="text-[8px] text-emerald-400 font-bold uppercase">Ready</span>
-              </div>`;
+            const name = s ? escapeHtml(s.name).slice(0, 30) + (s.name.length > 30 ? '...' : '') : shortName;
+            return `<button class="inline-flex items-center gap-1.5 mt-1 mb-0.5 px-2 py-1 bg-bg border border-brand/30 rounded-full hover:border-brand transition-colors cursor-pointer" onclick="window._blazePlay('${gen.sampleId}')">
+              <span class="text-[9px] text-txt truncate">${name}</span>
+              <span class="material-symbols-outlined text-[12px] fill-1 text-brand">play_arrow</span>
+            </button>`;
           } else if (gen && gen.status === 'error') {
-            playerHtml = `
-              <div class="flex items-center gap-2 mt-1.5 px-2 py-1.5 bg-red-500/5 border border-red-500/20 rounded">
-                <span class="material-symbols-outlined text-[12px] text-red-400">error</span>
-                <span class="text-[9px] text-red-400">Generation failed</span>
-                <button class="text-[8px] text-brand hover:text-brand-hover font-bold uppercase ml-auto" onclick="window._blazeRetryGen(${msgIndex}, ${pi})">Retry</button>
-              </div>`;
+            return `<button class="inline-flex items-center gap-1.5 mt-1 mb-0.5 px-2 py-1 bg-bg border border-red-500/30 rounded-full hover:border-red-500 transition-colors cursor-pointer" onclick="window._blazeRetryGen(${msgIndex}, ${pi})">
+              <span class="text-[9px] text-red-400 truncate">${escapeHtml(shortName)}</span>
+              <span class="material-symbols-outlined text-[10px] text-red-400">refresh</span>
+            </button>`;
           } else {
-            // Auto-generate if ElevenLabs key is set
             if (ELEVENLABS_API_KEY) {
               setTimeout(() => blazeGenerateSample(p, msgIndex, pi), pi * 600);
-              playerHtml = `
-                <div class="flex items-center gap-2 mt-1.5 px-2 py-1.5 bg-black/20 border border-border/50 rounded">
-                  <div class="flex items-end gap-[1px]">
-                    <span class="gen-loading-bar" style="height:10px"></span><span class="gen-loading-bar" style="height:10px"></span><span class="gen-loading-bar" style="height:10px"></span>
-                  </div>
-                  <span class="text-[9px] text-txt-muted">Generating...</span>
-                </div>`;
+              return `<div class="inline-flex items-center gap-1.5 mt-1 mb-0.5 px-2 py-1 bg-bg border border-border/50 rounded-full">
+                <div class="flex items-end gap-[1px]"><span class="gen-loading-bar" style="height:8px;width:1.5px"></span><span class="gen-loading-bar" style="height:8px;width:1.5px"></span><span class="gen-loading-bar" style="height:8px;width:1.5px"></span></div>
+                <span class="text-[9px] text-txt-muted truncate">${escapeHtml(shortName)}</span>
+              </div>`;
             } else {
-              playerHtml = `
-                <div class="mt-1.5">
-                  <button class="text-[8px] text-brand hover:text-brand-hover uppercase font-bold" onclick="window._blazeManualGen(${msgIndex}, ${pi})">Generate Sample</button>
-                </div>`;
+              return `<button class="inline-flex items-center gap-1.5 mt-1 mb-0.5 px-2 py-1 bg-bg border border-border/50 rounded-full hover:border-brand transition-colors cursor-pointer" onclick="window._blazeManualGen(${msgIndex}, ${pi})">
+                <span class="text-[9px] text-txt-muted truncate">${escapeHtml(shortName)}</span>
+                <span class="material-symbols-outlined text-[10px] text-brand">play_arrow</span>
+              </button>`;
             }
           }
-
-          return `<div class="mt-1.5 mb-1 bg-bg border border-brand/20 p-2 rounded">
-            <div class="flex items-center justify-between mb-1">
-              <span class="text-[8px] font-bold text-brand uppercase tracking-wider">${p.mode === 'loop' ? 'LOOP' : 'ONE-SHOT'}</span>
-              ${p.bpm ? `<span class="text-[8px] text-txt-dim">${p.bpm} BPM</span>` : ''}
-            </div>
-            <p class="text-[10px] text-txt font-medium mb-1">"${escapeHtml(p.text || '')}"</p>
-            ${playerHtml}
-          </div>`;
         } catch(e) {
           return match;
         }
@@ -442,6 +420,73 @@ window._blazeClear = function() {
   blazeGeneratedSamples = {};
   renderMessages();
 };
+
+// ==================== DRAG TO MOVE & RESIZE ====================
+(function initBlaiseDrag() {
+  const panel = document.getElementById('blaise-panel');
+  const header = panel.querySelector('.border-b.bg-panel');
+  const resizeHandle = document.getElementById('blaise-resize');
+  if (!header) return;
+  header.style.cursor = 'grab';
+
+  // --- Move ---
+  let moving = false, startX, startY, startLeft, startBottom;
+
+  header.addEventListener('mousedown', e => {
+    if (e.target.closest('button')) return;
+    moving = true;
+    header.style.cursor = 'grabbing';
+    const rect = panel.getBoundingClientRect();
+    startX = e.clientX;
+    startY = e.clientY;
+    startLeft = rect.left;
+    startBottom = window.innerHeight - rect.bottom;
+    panel.style.transition = 'none';
+    e.preventDefault();
+  });
+
+  // --- Resize (top-left corner) ---
+  let resizing = false, resStartX, resStartY, resStartW, resStartH, resStartLeft, resStartBottom;
+
+  resizeHandle.addEventListener('mousedown', e => {
+    resizing = true;
+    const rect = panel.getBoundingClientRect();
+    resStartX = e.clientX;
+    resStartY = e.clientY;
+    resStartW = rect.width;
+    resStartH = rect.height;
+    resStartLeft = rect.left;
+    resStartBottom = window.innerHeight - rect.bottom;
+    panel.style.transition = 'none';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (moving) {
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      panel.style.right = 'auto';
+      panel.style.left = (startLeft + dx) + 'px';
+      panel.style.bottom = (startBottom - dy) + 'px';
+    }
+    if (resizing) {
+      const dx = e.clientX - resStartX;
+      const dy = e.clientY - resStartY;
+      const newW = Math.max(280, resStartW - dx);
+      const newH = Math.max(300, resStartH - dy);
+      panel.style.width = newW + 'px';
+      panel.style.height = newH + 'px';
+      panel.style.right = 'auto';
+      panel.style.left = (resStartLeft + (resStartW - newW)) + 'px';
+      panel.style.bottom = resStartBottom + 'px';
+    }
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (moving) { moving = false; header.style.cursor = 'grab'; panel.style.transition = ''; }
+    if (resizing) { resizing = false; panel.style.transition = ''; }
+  });
+})();
 
 // Initial render
 renderMessages();
